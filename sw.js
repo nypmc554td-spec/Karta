@@ -1,6 +1,7 @@
 /* Karta drogowa — офлайн-кэш.
-   Меняешь index.html — подними номер версии ниже на 1, тогда телефон подтянет новую версию. */
-const V = "kd-v5";
+   Стратегия: страница всегда берётся из сети, если она есть (тогда обновления
+   доезжают сразу), а без сети — из кэша. Картинки/манифест — из кэша. */
+const V = "kd-v6";
 const FILES = [
   "./",
   "./index.html",
@@ -26,21 +27,28 @@ self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
-
-  // Чужие домены (например определение города по координатам) — только сеть, без кэша.
   if (url.origin !== self.location.origin) return;
 
-  // Своё — сначала кэш, потом сеть; сеть обновляет кэш в фоне.
-  e.respondWith(
-    caches.match(req).then(hit => {
-      const net = fetch(req).then(res => {
-        if (res && res.ok) {
+  const isPage = req.mode === "navigate" || url.pathname.endsWith("/") || url.pathname.endsWith(".html");
+
+  if (isPage) {
+    // сеть вперёд — свежая версия всегда побеждает
+    e.respondWith(
+      fetch(req, { cache: "no-store" })
+        .then(res => {
           const copy = res.clone();
-          caches.open(V).then(c => c.put(req, copy));
-        }
-        return res;
-      }).catch(() => hit);
-      return hit || net;
-    })
+          caches.open(V).then(c => c.put("./index.html", copy));
+          return res;
+        })
+        .catch(() => caches.match("./index.html").then(hit => hit || caches.match("./")))
+    );
+    return;
+  }
+
+  e.respondWith(
+    caches.match(req).then(hit => hit || fetch(req).then(res => {
+      if (res && res.ok) { const copy = res.clone(); caches.open(V).then(c => c.put(req, copy)); }
+      return res;
+    }))
   );
 });

@@ -152,7 +152,7 @@ body.preview main,body.preview nav,body.preview header{display:none}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v5</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v6</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPreview">Предпросмотр</button>
@@ -829,7 +829,15 @@ window.addEventListener("beforeprint", buildPrint);
 
 /* ================= Офлайн ================= */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
-  window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", ()=>{
+    if(reloaded) return; reloaded = true; location.reload();
+  });
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("sw.js", {updateViaCache:"none"})
+      .then(r=>{ r.update(); setInterval(()=>r.update(), 60000); })
+      .catch(()=>{});
+  });
 }
 
 /* ================= Старт ================= */
