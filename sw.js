@@ -1,6 +1,6 @@
 /* Karta drogowa — офлайн-кэш.
    Меняешь index.html — подними номер версии ниже на 1, тогда телефон подтянет новую версию. */
-const V = "kd-v3";
+const V = "kd-v4";
 const FILES = [
   "./",
   "./index.html",

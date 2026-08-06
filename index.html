@@ -101,12 +101,12 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
   background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
 
 /* ================= PRINT SHEET (точная копия бланка) ================= */
-#print{position:absolute;left:-99999px;top:0;width:718px;background:#fff;color:#000}
+#print{position:absolute;left:-99999px;top:0;width:680px;background:#fff;color:#000}
 body.preview #print{position:static;left:auto;padding:10px 0}
 body.preview main,body.preview nav,body.preview header{display:none}
-.page{width:718px;height:1000px;overflow:hidden;background:#fff;margin:0 auto 10px}
+.page{width:680px;height:880px;overflow:hidden;background:#fff;margin:0 auto 10px}
 .sheet{
-  width:718px;min-height:1000px;background:#fff;
+  width:680px;min-height:880px;background:#fff;
   font-family:"Times New Roman",Times,serif;color:#000;
   display:flex;flex-direction:column;transform-origin:top left;
 }
@@ -144,7 +144,7 @@ body.preview main,body.preview nav,body.preview header{display:none}
   #print{position:static!important;left:auto!important;top:auto!important;padding:0!important;zoom:1!important}
   .page{margin:0;page-break-after:always;break-after:page;page-break-inside:avoid;break-inside:avoid}
   .page:last-child{page-break-after:auto;break-after:auto}
-  @page{size:A4 portrait;margin:10mm 10mm 12mm}
+  @page{size:A4 portrait;margin:12mm}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -699,7 +699,7 @@ function buildPrint(){
 }
 
 /* Каждый лист ужимается ровно под один A4, чтобы всегда было 4 страницы */
-const BOX_W = 718, BOX_H = 1000;
+const BOX_W = 680, BOX_H = 880;
 function fitPages(){
   document.querySelectorAll("#print .sheet").forEach(sh=>{
     let s = 1;
