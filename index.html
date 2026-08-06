@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0E1418">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-title" content="Karta">
+<title>Karta drogowa</title>
+<style>
+:root{
+  --bg:#0E1418; --panel:#18222A; --panel2:#1F2C35; --line:#2C3C47;
+  --ink:#E8EEF1; --dim:#8FA3AF; --amber:#F0A937; --green:#4FB477; --red:#E3573A;
+  --r:14px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+/* ---------- Top bar ---------- */
+header{
+  position:sticky; top:0; z-index:50; background:rgba(14,20,24,.94);
+  backdrop-filter:blur(10px); border-bottom:1px solid var(--line);
+  padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;
+}
+.brand{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.brand b{font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);font-weight:700}
+.brand small{color:var(--dim);font-size:11px;letter-spacing:.08em;margin-left:auto}
+.bar{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+.bar::-webkit-scrollbar{display:none}
+.btn{
+  flex:0 0 auto;background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+  border-radius:10px;padding:9px 12px;font-size:14px;font-weight:600;cursor:pointer;
+}
+.btn:active{background:#27363f}
+.btn.primary{background:var(--amber);color:#1a1206;border-color:var(--amber)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--red)}
+/* ---------- Tabs ---------- */
+nav{display:flex;gap:4px;overflow-x:auto;padding:8px 12px 0;position:sticky;top:0;z-index:40}
+nav::-webkit-scrollbar{display:none}
+.tab{
+  flex:0 0 auto;padding:9px 13px;border-radius:10px 10px 0 0;background:transparent;
+  border:1px solid transparent;border-bottom:none;color:var(--dim);font-size:14px;font-weight:600;cursor:pointer;
+}
+.tab.on{background:var(--panel);color:var(--amber);border-color:var(--line)}
+main{padding:0 12px 90px}
+section.pane{display:none}
+section.pane.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin:10px 0}
+.card > h3{
+  margin:0 0 10px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);font-weight:700;
+}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid .full{grid-column:1/-1}
+label.f{display:block}
+label.f > span{display:block;font-size:11px;color:var(--dim);margin:0 0 3px 2px;letter-spacing:.03em}
+input,textarea,select{
+  width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  color:var(--ink);font:16px/1.2 inherit;padding:11px 10px;appearance:none;-webkit-appearance:none;
+}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--amber);outline-offset:1px;border-color:var(--amber)}
+input[type=date],input[type=time]{min-height:44px}
+textarea{min-height:90px;line-height:1.35}
+.row2{display:flex;gap:6px}
+.row2 > *{flex:1}
+.mini{
+  flex:0 0 auto;background:transparent;border:1px solid var(--line);color:var(--amber);
+  border-radius:9px;padding:0 10px;font-size:12px;font-weight:700;cursor:pointer;min-height:44px;
+}
+.mini:active{background:var(--panel2)}
+.item{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;margin:8px 0}
+.item .ihead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.item .ihead b{font-size:12px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase}
+.item .ihead .del{margin-left:auto;background:transparent;border:none;color:var(--red);font-size:13px;font-weight:700;cursor:pointer;padding:4px 6px}
+.sub{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin:14px 0 4px 2px}
+.hint{color:var(--dim);font-size:12px;line-height:1.5;margin:8px 2px}
+.count{color:var(--dim);font-size:12px;margin-left:auto}
+.add{width:100%;margin-top:6px;background:transparent;border:1px dashed var(--line);color:var(--amber);
+  border-radius:12px;padding:12px;font-size:14px;font-weight:700;cursor:pointer}
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom));
+  background:var(--green);color:#06210f;padding:10px 16px;border-radius:99px;font-weight:700;font-size:14px;
+  z-index:100;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+.instr{color:#D5E0E6;font-size:14px;line-height:1.55}
+.instr li{margin:0 0 12px}
+.instr h4{color:var(--amber);font-size:12px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}
+.sigpad{width:100%;height:140px;background:#fff;border:1px solid var(--line);border-radius:12px;touch-action:none;display:block;cursor:crosshair}
+.sigwrap{margin:6px 0 12px}
+.sigrow{display:flex;align-items:center;gap:8px;margin-top:6px}
+.sigrow .mini{min-height:38px}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+  background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+
+/* ================= PRINT SHEET (точная копия бланка) ================= */
+#print{display:none;background:#fff;color:#000}
+body.preview #print{display:block;padding:10px 0}
+body.preview main,body.preview nav,body.preview header{display:none}
+.page{
+  width:210mm;min-height:296mm;background:#fff;margin:0 auto 8px;padding:8mm 7mm;
+  font-family:"Times New Roman",Times,serif;color:#000;
+}
+.page + .page{page-break-before:always}
+.page table{border-collapse:collapse;width:100%;table-layout:fixed}
+.page td,.page th{border:1px solid #000;padding:1px 3px;vertical-align:middle;font-size:9pt;line-height:1.15;word-wrap:break-word}
+.b{font-weight:bold}
+.c{text-align:center}
+.i{font-style:italic}
+.nb td{border:none}
+.val{font-family:"Courier New",monospace;font-size:8.5pt}
+.h1{text-align:center;font-weight:bold;font-size:12pt;margin:0 0 6px}
+.h2{text-align:center;font-weight:bold;font-style:italic;font-size:10.5pt;margin:8px 0 4px}
+.decl{font-style:italic;font-weight:bold;text-decoration:underline;font-size:10pt;margin:8px 0 2px;text-align:center}
+.trasa td{height:5.1mm;font-size:7.5pt}
+.trasa th{font-size:7.5pt;font-weight:bold;text-align:center}
+.tank{font-family:Arial,Helvetica,sans-serif}
+.tank td,.tank th{font-size:8pt;height:5.2mm}
+.tank th{font-weight:bold;text-align:center}
+.lines{border:1px solid #000;padding:3px 5px}
+.lines div{font-size:9pt;line-height:1.65;white-space:nowrap;overflow:hidden}
+.dot{letter-spacing:.5px}
+.sig{margin-top:16px;display:flex;justify-content:space-between;font-weight:bold;font-style:italic;font-size:10pt}
+.sig div{width:45%}
+.sig u{display:block;font-weight:normal;font-style:normal;margin-top:2px}
+.sigbox{height:14mm;display:flex;align-items:flex-end}
+.sigbox img{max-height:14mm;max-width:100%;display:block}
+.note{font-size:9pt;font-weight:bold;margin-top:14px;line-height:1.35}
+.rus{font-family:Arial,Helvetica,sans-serif;font-size:9pt;line-height:1.45}
+.rus li{margin-bottom:9px}
+@media print{
+  header,nav,main,.toast{display:none!important}
+  #print{display:block!important}
+  body{background:#fff}
+  .page{width:auto;min-height:auto;margin:0;padding:0;page-break-after:always}
+  .page:last-child{page-break-after:auto}
+  @page{size:A4 portrait;margin:9mm 8mm}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><b>Karta drogowa</b><small id="saveState">—</small></div>
+  <div class="bar">
+    <button class="btn primary" id="btnPrint">Печать / PDF</button>
+    <button class="btn" id="btnPreview">Предпросмотр</button>
+    <select id="cardSel" style="width:auto;min-width:150px;padding:9px 30px 9px 10px;font-size:14px"></select>
+    <button class="btn" id="btnNew">Новая карта</button>
+    <button class="btn ghost" id="btnRename">Переименовать</button>
+    <button class="btn ghost" id="btnExport">Экспорт</button>
+    <button class="btn ghost" id="btnImport">Импорт</button>
+    <button class="btn ghost danger" id="btnDel">Удалить</button>
+  </div>
+</header>
+
+<nav id="tabs"></nav>
+<main>
+  <section class="pane" id="pane-main"></section>
+  <section class="pane" id="pane-trasa"></section>
+  <section class="pane" id="pane-tank"></section>
+  <section class="pane" id="pane-koszty"></section>
+  <section class="pane" id="pane-info"></section>
+</main>
+
+<div id="print"></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="fileIn" accept="application/json,.json" style="display:none">
+
+<script>
+"use strict";
+
+/* ================= Хранилище: работает и в приложении Claude, и в Safari ================= */
+const Store = {
+  async get(k){
+    try{ if(window.storage){ const r = await window.storage.get(k,false); return r? r.value : null; } }catch(e){}
+    try{ return localStorage.getItem(k); }catch(e){}
+    return (Store._m && Store._m[k]) || null;
+  },
+  async set(k,v){
+    try{ if(window.storage){ await window.storage.set(k,v,false); return true; } }catch(e){}
+    try{ localStorage.setItem(k,v); return true; }catch(e){}
+    Store._m = Store._m || {}; Store._m[k]=v; return true;
+  }
+};
+const KEY = "kd_v1";
+
+/* ================= Модель ================= */
+const LIMITS = {trasa:30, tankON:17, tankAd:9, tankChl:3, zakupy:10, oplaty:10, serwisy:5, mandaty:3, wlasne:3};
+const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+function newCard(name){
+  return {
+    id: uid(),
+    name: name || ("Karta " + new Date().toLocaleDateString("ru-RU")),
+    head:{nrWyjazdu:"",nrTeczki:"",nrRej:"",paliwo:"ON",k1i:"",k1n:"",k2i:"",k2n:""},
+    bus:{wyjD:"",wyjG:"",przyjSamD:"",przyjSamG:"",miejsL:"",powrD:"",powrG:"",przyjBazD:"",przyjBazG:"",miejsP:""},
+    baza:{wyjD:"",wyjG:"",powrD:"",powrG:""},
+    stany:{kmP:"",kmK:"",palP:"",palK:"",kompP:"",kompK:"",adbP:"",adbK:""},
+    trasa:[], tankON:[], tankAd:[], tankChl:[],
+    zakupy:[], oplaty:[], serwisy:[], mandaty:[], wlasne:[],
+    sig:{k1:"",k2:""},
+    uwagi:"", printInstr:false
+  };
+}
+const blank = {
+  trasa:()=>({nr:"",zk:"",zm:"",zd:"",zg:"",zl:"",wk:"",wm:"",wd:"",wg:"",wl:"",waga:""}),
+  tank:()=>({d:"",kraj:"",karta:"",litry:"",pelna:"",licznik:"",paragon:""}),
+  tankChl:()=>({d:"",kraj:"",karta:"",rej:"",mgP:"",mgK:"",litry:""}),
+  zakupy:()=>({co:"",d:"",bank:"",kwota:"",kraj:""}),
+  oplaty:()=>({co:"",d:"",karta:"",kwota:"",kraj:""}),
+  wlasne:()=>({co:"",d:"",kwota:"",kraj:"",kier:""})
+};
+
+let DB = {cards:[], active:""};
+let C = null;                       // активная карта
+
+/* ================= Утилиты ================= */
+const $ = s=>document.querySelector(s);
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+function getP(o,p){ return p.split(".").reduce((a,k)=> (a==null?a:a[k]), o); }
+function setP(o,p,v){ const k=p.split("."); const last=k.pop(); let t=o; k.forEach(x=> t=t[x]); t[last]=v; }
+function fmtD(iso,short){ if(!iso) return ""; const [y,m,d]=iso.split("-"); if(!d) return iso;
+  return short ? `${d}.${m}.${y.slice(2)}` : `${d}.${m}.${y}`; }
+function fmtDT(iso,g,short){ const a=fmtD(iso,short), b=g||""; return (a||b)? `${a} / ${b}` : ""; }
+function todayISO(){ const t=new Date(); return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); }
+function nowHM(){ const t=new Date(); return String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0"); }
+let toastT;
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("on"),1600); }
+
+/* ================= Сохранение ================= */
+let saveT;
+function save(now){
+  $("#saveState").textContent = "сохраняю…";
+  clearTimeout(saveT);
+  const go = async ()=>{
+    await Store.set(KEY, JSON.stringify(DB));
+    $("#saveState").textContent = "сохранено " + nowHM();
+  };
+  if(now) go(); else saveT = setTimeout(go, 400);
+}
+
+/* ================= Определение страны/города по GPS ================= */
+const BOX = [ /* [код, latMin, latMax, lonMin, lonMax] */
+ ["LU",49.4,50.2,5.7,6.6],["SI",45.4,46.9,13.3,16.6],["BE",49.4,51.6,2.5,6.4],["NL",50.7,53.6,3.3,7.3],
+ ["CH",45.8,47.9,5.9,10.5],["ME",41.8,43.6,18.4,20.4],["MK",40.8,42.4,20.4,23.0],["AL",39.6,42.7,19.2,21.1],
+ ["DK",54.5,57.8,8.0,12.8],["BA",42.5,45.3,15.7,19.7],["SK",47.7,49.7,16.8,22.6],["CZ",48.5,51.1,12.0,18.9],
+ ["HU",45.7,48.6,16.1,22.9],["AT",46.3,49.1,9.5,17.2],["HR",42.3,46.6,13.4,19.5],["RS",42.2,46.2,18.8,23.0],
+ ["LT",53.9,56.5,20.9,26.9],["LV",55.6,58.1,20.9,28.3],["EE",57.5,59.7,21.7,28.2],["MD",45.4,48.5,26.6,30.2],
+ ["PL",49.0,54.9,14.1,24.2],["DE",47.2,55.1,5.8,15.1],["FR",42.3,51.1,-5.2,8.3],["IT",36.6,47.1,6.6,18.6],
+ ["ES",36.0,43.8,-9.4,3.4],["PT",36.9,42.2,-9.6,-6.1],["GB",49.9,58.7,-8.2,1.8],["IE",51.4,55.4,-10.6,-5.9],
+ ["NO",57.9,71.2,4.6,31.1],["SE",55.3,69.1,11.0,24.2],["FI",59.7,70.1,20.5,31.6],["BY",51.2,56.2,23.1,32.8],
+ ["UA",44.3,52.4,22.1,40.2],["RO",43.6,48.3,20.2,29.7],["BG",41.2,44.2,22.3,28.6],["GR",34.8,41.8,19.3,28.3],
+ ["TR",35.8,42.1,25.6,44.8],["RU",41.2,77.0,19.6,180.0]
+].sort((a,b)=> ((a[2]-a[1])*(a[4]-a[3])) - ((b[2]-b[1])*(b[4]-b[3])));
+
+function countryByCoords(lat,lon){
+  for(const b of BOX){ if(lat>=b[1]&&lat<=b[2]&&lon>=b[3]&&lon<=b[4]) return b[0]; }
+  return "";
+}
+function gps(){
+  return new Promise((res,rej)=>{
+    if(!navigator.geolocation) return rej(new Error("Геолокация недоступна"));
+    navigator.geolocation.getCurrentPosition(
+      p=>res({lat:p.coords.latitude, lon:p.coords.longitude}),
+      e=>rej(e), {enableHighAccuracy:true, timeout:10000, maximumAge:60000});
+  });
+}
+async function placeNow(){
+  const {lat,lon} = await gps();
+  let kraj = countryByCoords(lat,lon), city = "";
+  try{
+    const ctl = new AbortController(); const t=setTimeout(()=>ctl.abort(),4500);
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&lat=${lat}&lon=${lon}`,{signal:ctl.signal});
+    clearTimeout(t);
+    if(r.ok){ const j = await r.json(); const a=j.address||{};
+      if(a.country_code) kraj = a.country_code.toUpperCase();
+      city = a.city||a.town||a.village||a.municipality||a.county||"";
+    }
+  }catch(e){ /* офлайн — остаётся определение по координатам */ }
+  return {kraj, city, lat, lon};
+}
+
+/* ================= Конструкторы полей ================= */
+function inp(path,label,type,extra){
+  const v = esc(getP(C,path));
+  const t = type||"text";
+  const attrs = extra||"";
+  return `<label class="f"><span>${esc(label)}</span><input type="${t}" data-p="${path}" value="${v}" ${attrs}></label>`;
+}
+function dateF(path,label){ return `<label class="f"><span>${esc(label)}</span>
+  <div class="row2"><input type="date" data-p="${path}" value="${esc(getP(C,path))}">
+  <button class="mini" data-now="d|${path}">Сег.</button></div></label>`; }
+function timeF(path,label){ return `<label class="f"><span>${esc(label)}</span>
+  <div class="row2"><input type="time" data-p="${path}" value="${esc(getP(C,path))}">
+  <button class="mini" data-now="t|${path}">Сейч.</button></div></label>`; }
+function dtF(pd,pt,label){ return `<div class="full"><label class="f"><span>${esc(label)}</span>
+  <div class="row2"><input type="date" data-p="${pd}" value="${esc(getP(C,pd))}">
+  <input type="time" data-p="${pt}" value="${esc(getP(C,pt))}">
+  <button class="mini" data-now="dt|${pd}|${pt}">Сейчас</button></div></label></div>`; }
+function gpsF(pk,pm,label){ return `<div class="full"><label class="f"><span>${esc(label)}</span>
+  <div class="row2"><input data-p="${pk}" value="${esc(getP(C,pk))}" placeholder="Kraj" style="max-width:90px">
+  ${pm?`<input data-p="${pm}" value="${esc(getP(C,pm))}" placeholder="Miasto">`:""}
+  <button class="mini" data-gps="${pk}|${pm||""}">GPS</button></div></label></div>`; }
+function num(path,label,ph){ return `<label class="f"><span>${esc(label)}</span>
+  <input data-p="${path}" value="${esc(getP(C,path))}" inputmode="decimal" placeholder="${esc(ph||"")}"></label>`; }
+function yn(path,label){ const v=getP(C,path);
+  return `<label class="f"><span>${esc(label)}</span><select data-p="${path}">
+   <option value=""${v===""?" selected":""}>—</option>
+   <option value="tak"${v==="tak"?" selected":""}>tak</option>
+   <option value="nie"${v==="nie"?" selected":""}>nie</option></select></label>`; }
+
+/* ================= Экраны ================= */
+const TABS = [["main","Карта"],["trasa","Trasa"],["tank","Заправки"],["koszty","Расходы"],["info","Инструкция"]];
+let activeTab = "main";
+
+function renderTabs(){
+  $("#tabs").innerHTML = TABS.map(([k,t])=>`<button class="tab ${k===activeTab?"on":""}" data-tab="${k}">${t}</button>`).join("");
+  document.querySelectorAll(".pane").forEach(p=>p.classList.toggle("on", p.id==="pane-"+activeTab));
+}
+
+function renderMain(){
+  $("#pane-main").innerHTML = `
+  <div class="card"><h3>Nagłówek</h3><div class="grid">
+    ${inp("head.nrWyjazdu","Numer Wyjazdu — номер выезда")}
+    ${inp("head.nrTeczki","Numer Teczki — номер папки")}
+    ${inp("head.nrRej","Samochód — Nr rej.")}
+    ${inp("head.paliwo","Rodzaj paliwa")}
+    ${inp("head.k1i","Kierowca 1 — Imię")}
+    ${inp("head.k1n","Kierowca 1 — Nazwisko")}
+    ${inp("head.k2i","Kierowca 2 — Imię")}
+    ${inp("head.k2n","Kierowca 2 — Nazwisko")}
+  </div></div>
+
+  <div class="card"><h3>Bus — выезд с базы</h3><div class="grid">
+    ${dtF("bus.wyjD","bus.wyjG","Wyjazd Busem z bazy — выезд с базы")}
+    ${dtF("bus.przyjSamD","bus.przyjSamG","Przyjazd Busem do samochodu — приезд к тягачу")}
+    ${gpsF("bus.miejsL","","Miejscowość (левая колонка)")}
+  </div></div>
+
+  <div class="card"><h3>Bus — возврат на базу</h3><div class="grid">
+    ${dtF("bus.powrD","bus.powrG","Powrót Busem do Bazy — выезд к базе")}
+    ${dtF("bus.przyjBazD","bus.przyjBazG","Przyjazd Busem do bazy — приезд на базу")}
+    ${gpsF("bus.miejsP","","Miejscowość (правая колонка)")}
+  </div></div>
+
+  <div class="card"><h3>Wyjazd z bazy / Powrót na bazę</h3><div class="grid">
+    ${dtF("baza.wyjD","baza.wyjG","WYJAZD Z BAZY — начало работы")}
+    ${dtF("baza.powrD","baza.powrG","POWRÓT NA BAZĘ — окончание работы")}
+  </div></div>
+
+  <div class="card"><h3>Stany Samochodu</h3>
+    <div class="sub">Stan licznika KM — километраж</div>
+    <div class="grid">${num("stany.kmP","Początek")}${num("stany.kmK","Koniec")}</div>
+    <div class="sub">Stan Paliwa — топливо, %</div>
+    <div class="grid">${num("stany.palP","Początek")}${num("stany.palK","Koniec")}</div>
+    <div class="sub">Stan licznika zużycia paliwa z komputera</div>
+    <div class="grid">${num("stany.kompP","Początek")}${num("stany.kompK","Koniec")}</div>
+    <div class="sub">Stan Ad-Blue — %</div>
+    <div class="grid">${num("stany.adbP","Początek")}${num("stany.adbK","Koniec")}</div>
+    <p class="hint">Показания переписываем с компьютера в тягаче: перед выездом с базы — Początek, после приезда — Koniec.</p>
+  </div>
+
+  <div class="card"><h3>Dodatkowe uwagi</h3>
+    <textarea data-p="uwagi" placeholder="Примечания на бланк">${esc(C.uwagi)}</textarea>
+  </div>
+
+  <div class="card"><h3>Podpisy — подписи</h3>
+    <div class="sigwrap">
+      <label class="f"><span>Pierwszy kierowca — расписаться пальцем</span></label>
+      <canvas class="sigpad" data-sig="sig.k1"></canvas>
+      <div class="sigrow"><button class="mini" data-sigclear="sig.k1">Очистить</button>
+        <span class="hint" style="margin:0">${C.sig.k1?"подпись сохранена":"пусто"}</span></div>
+    </div>
+    <div class="sigwrap">
+      <label class="f"><span>Drugi kierowca — расписаться пальцем</span></label>
+      <canvas class="sigpad" data-sig="sig.k2"></canvas>
+      <div class="sigrow"><button class="mini" data-sigclear="sig.k2">Очистить</button>
+        <span class="hint" style="margin:0">${C.sig.k2?"подпись сохранена":"пусто"}</span></div>
+    </div>
+    <p class="hint">Подпись встанет на бланке над линией «Pierwszy kierowca» / «Drugi kierowca». Если оставить пусто — напечатается чистая линия, как в оригинале.</p>
+  </div>`;
+  initSigs();
+}
+
+/* --------- Подпись пальцем --------- */
+function initSigs(){
+  document.querySelectorAll("canvas[data-sig]").forEach(cv=>{
+    const path = cv.dataset.sig;
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    const w = cv.clientWidth || 300, h = 140;
+    cv.width = w*dpr; cv.height = h*dpr;
+    const ctx = cv.getContext("2d");
+    ctx.scale(dpr,dpr);
+    ctx.lineWidth = 2.4; ctx.lineCap="round"; ctx.lineJoin="round"; ctx.strokeStyle="#0E1418";
+    const saved = getP(C,path);
+    if(saved){ const img = new Image(); img.onload = ()=> ctx.drawImage(img,0,0,w,h); img.src = saved; }
+    let drawing=false, last=null;
+    const pos = e =>{ const r = cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; };
+    cv.addEventListener("pointerdown", e=>{
+      e.preventDefault(); drawing=true; last=pos(e);
+      try{ cv.setPointerCapture(e.pointerId); }catch(err){}
+      ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(last.x+0.1,last.y); ctx.stroke();
+    });
+    cv.addEventListener("pointermove", e=>{
+      if(!drawing) return; e.preventDefault();
+      const p = pos(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p;
+    });
+    const end = ()=>{ if(!drawing) return; drawing=false;
+      setP(C, path, cv.toDataURL("image/png")); save(); };
+    cv.addEventListener("pointerup", end);
+    cv.addEventListener("pointercancel", end);
+    cv.addEventListener("pointerleave", end);
+  });
+}
+
+function renderTrasa(){
+  const rows = C.trasa.map((r,i)=>`
+  <div class="item">
+    <div class="ihead"><b>Строка ${i+1}</b><button class="del" data-del="trasa|${i}">Удалить</button></div>
+    <div class="grid">
+      ${inp("trasa."+i+".nr","Nr zlecenia")}
+      ${num("trasa."+i+".waga","Waga ładunku","т / кг")}
+    </div>
+    <div class="sub">Załadunek — загрузка</div>
+    <div class="grid">
+      ${gpsF("trasa."+i+".zk","trasa."+i+".zm","Kraj / Miasto")}
+      ${dtF("trasa."+i+".zd","trasa."+i+".zg","Data / Godz. — ПОСЛЕ окончания загрузки")}
+      <div class="full">${num("trasa."+i+".zl","Stan licznika")}</div>
+    </div>
+    <div class="sub">Wyładunek — выгрузка</div>
+    <div class="grid">
+      ${gpsF("trasa."+i+".wk","trasa."+i+".wm","Kraj / Miasto")}
+      ${dtF("trasa."+i+".wd","trasa."+i+".wg","Data / Godz. — ПОСЛЕ окончания выгрузки")}
+      <div class="full">${num("trasa."+i+".wl","Stan licznika")}</div>
+    </div>
+  </div>`).join("");
+  $("#pane-trasa").innerHTML = `<div class="card">
+    <h3>Trasa <span class="count">${C.trasa.length} / ${LIMITS.trasa} строк на бланке</span></h3>
+    ${rows || '<p class="hint">Пока пусто. Добавьте первую загрузку.</p>'}
+    <button class="add" data-add="trasa">+ Добавить строку</button>
+    <p class="hint">Вписываем ВСЕ загрузки и ВСЕ выгрузки. При перецепке: получая груз — Załadunek, передавая — Wyładunek. Вес переписываем с CMR.</p>
+  </div>`;
+}
+
+function renderTank(){
+  const on = C.tankON.map((r,i)=>tankItem("tankON",i,r)).join("");
+  const ad = C.tankAd.map((r,i)=>tankItem("tankAd",i,r)).join("");
+  const ch = C.tankChl.map((r,i)=>`
+  <div class="item"><div class="ihead"><b>${i+1}</b><button class="del" data-del="tankChl|${i}">Удалить</button></div>
+    <div class="grid">
+      ${dateF("tankChl."+i+".d","Data tankowania")}
+      ${inp("tankChl."+i+".karta","Rodzaj karty")}
+      ${gpsF("tankChl."+i+".kraj","","Kraj")}
+      ${inp("tankChl."+i+".rej","Numer rej. chłodni")}
+      ${num("tankChl."+i+".mgP","Motogodziny — Początek")}
+      ${num("tankChl."+i+".mgK","Motogodziny — Koniec")}
+      <div class="full">${num("tankChl."+i+".litry","Zatankowane litry")}</div>
+    </div></div>`).join("");
+  $("#pane-tank").innerHTML = `
+  <div class="card"><h3>Tankowania ciągnika ON <span class="count">${C.tankON.length} / ${LIMITS.tankON}</span></h3>
+    ${on||'<p class="hint">Пусто.</p>'}<button class="add" data-add="tankON">+ Заправка ON</button></div>
+  <div class="card"><h3>Tankowania AdBlue <span class="count">${C.tankAd.length} / ${LIMITS.tankAd}</span></h3>
+    ${ad||'<p class="hint">Пусто.</p>'}<button class="add" data-add="tankAd">+ Заправка AdBlue</button></div>
+  <div class="card"><h3>Tankowania chłodni <span class="count">${C.tankChl.length} / ${LIMITS.tankChl}</span></h3>
+    ${ch||'<p class="hint">Пусто.</p>'}<button class="add" data-add="tankChl">+ Заправка холодильника</button>
+    <p class="hint">Заправку холодильника берём отдельным чеком, в Trimble вписываем как «paliwo», на чеке подписываем «chłodnia». Не суммируем — каждый бак отдельной строкой.</p></div>`;
+}
+function tankItem(list,i,r){
+  return `<div class="item"><div class="ihead"><b>${i+1}</b><button class="del" data-del="${list}|${i}">Удалить</button></div>
+  <div class="grid">
+    ${dateF(list+"."+i+".d","Data tankowania")}
+    ${gpsF(list+"."+i+".kraj","","Kraj")}
+    ${inp(list+"."+i+".karta","Rodzaj karty")}
+    ${num(list+"."+i+".litry","Zatankowane litry")}
+    ${yn(list+"."+i+".pelna","Czy do pełna?")}
+    ${num(list+"."+i+".licznik","Stan licznika")}
+    <div class="full">${yn(list+"."+i+".paragon","Czy jest paragon?")}</div>
+  </div></div>`;
+}
+
+function renderKoszty(){
+  const z = C.zakupy.map((r,i)=>`<div class="item"><div class="ihead"><b>${i+1}</b><button class="del" data-del="zakupy|${i}">Удалить</button></div>
+    <div class="grid"><div class="full">${inp("zakupy."+i+".co","Za co — за что")}</div>
+    ${dateF("zakupy."+i+".d","Data")}${inp("zakupy."+i+".bank","Bank / karta")}
+    ${num("zakupy."+i+".kwota","Kwota")}${gpsF("zakupy."+i+".kraj","","Kraj")}</div></div>`).join("");
+  const mk = (list,label)=> C[list].map((r,i)=>`<div class="item"><div class="ihead"><b>${i+1}</b><button class="del" data-del="${list}|${i}">Удалить</button></div>
+    <div class="grid"><div class="full">${inp(list+"."+i+".co","Za co")}</div>
+    ${dateF(list+"."+i+".d","Data")}${inp(list+"."+i+".karta","Rodzaj karty")}
+    ${num(list+"."+i+".kwota","Kwota")}${gpsF(list+"."+i+".kraj","","Kraj")}</div></div>`).join("");
+  const w = C.wlasne.map((r,i)=>`<div class="item"><div class="ihead"><b>${i+1}</b><button class="del" data-del="wlasne|${i}">Удалить</button></div>
+    <div class="grid"><div class="full">${inp("wlasne."+i+".co","Za co")}</div>
+    ${dateF("wlasne."+i+".d","Data")}${num("wlasne."+i+".kwota","Kwota")}
+    ${gpsF("wlasne."+i+".kraj","","Kraj")}${inp("wlasne."+i+".kier","Kierowca")}</div></div>`).join("");
+
+  $("#pane-koszty").innerHTML = `
+  <div class="card"><h3>Dodatkowe zakupy kartą bankową lub gotówką <span class="count">${C.zakupy.length} / ${LIMITS.zakupy}</span></h3>
+    ${z||'<p class="hint">Пусто.</p>'}<button class="add" data-add="zakupy">+ Покупка</button>
+    <p class="hint">В Польше по карте фирмы (Visa / Mastercard) обязательно берём FAKTURA VAT. Нет чека — пишем oświadczenie.</p></div>
+  <div class="card"><h3>Opłaty drogowe / autostrady / mosty / tunele <span class="count">${C.oplaty.length} / ${LIMITS.oplaty}</span></h3>
+    ${mk("oplaty")||'<p class="hint">Пусто.</p>'}<button class="add" data-add="oplaty">+ Оплата</button></div>
+  <div class="card"><h3>Serwisy / naprawy <span class="count">${C.serwisy.length} / ${LIMITS.serwisy}</span></h3>
+    ${mk("serwisy")||'<p class="hint">Пусто.</p>'}<button class="add" data-add="serwisy">+ Сервис</button></div>
+  <div class="card"><h3>Mandaty <span class="count">${C.mandaty.length} / ${LIMITS.mandaty}</span></h3>
+    ${mk("mandaty")||'<p class="hint">Пусто.</p>'}<button class="add" data-add="mandaty">+ Штраф</button></div>
+  <div class="card"><h3>Zakupy własną kartą lub gotówką <span class="count">${C.wlasne.length} / ${LIMITS.wlasne}</span></h3>
+    ${w||'<p class="hint">Пусто.</p>'}<button class="add" data-add="wlasne">+ Своя покупка</button></div>`;
+}
+
+const INSTR = [
+ "Чистые бланки выдаются на базе. Номер машины, имя и фамилия первого и второго водителя уже будут заполнены — нужно проверить только правильность данных.",
+ "В графе «WYJAZD» вписываем день и время начала работы, в графе «POWRÓT» — дату и время окончания работы. Если вы доезжаете с базы до тягача автобусом, то сначала в графе «WYJAZD BUSEM» — дату и время начала работы (выезд с базы), в графе «PRZYJAZD BUSEM» — дату и время приезда до тягача. Если возвращаетесь до базы на автобусе, то в графе «POWRÓT BUSEM» — дату и время выезда до базы, в графе «PRZYJAZD BUSEM» — дату и время приезда на базу (окончание работы).",
+ "Диета начисляется в течение 14 дней после закрытия карты. Есть возможность закрытия карты после 1 месяца командировки (если вы в трассе 2, 3 месяца или дольше). В таком случае обязательно закрываем карту после выгрузки: в графе «POWRÓT» указываем дату и время последней выгрузки, вписываем километраж на этот момент и stany samochodu. Отдаём карту водителям, которые съезжают на базу, и начинаем новую карту.",
+ "Если происходят изменения в экипаже либо замена тягача — обязательно заканчиваем текущую карту и начинаем новую.",
+ "Переписываем stany samochodu с компьютера в тягаче перед выездом с базы (początek) и после приезда на базу (koniec). Stan licznika KM — километраж, stan licznika zużycia paliwa z komputera — общий расход топлива, stan paliwa — количество топлива (в %), stan Ad-Blue — количество Ad-Blue (в %).",
+ "В графах «ZAŁADUNEK» и «WYŁADUNEK» вписываем номер заявки (nr zlecenia), страну, город, дату и время ПОСЛЕ ЗАВЕРШЕНИЯ загрузки/выгрузки, километраж в этот момент и вес груза (переписываем с CMR). Вписываем ВСЕ загрузки и ВСЕ выгрузки. В случае перецепки: получая груз — данные в «ZAŁADUNEK», передавая груз — в «WYŁADUNEK».",
+ "Вписываем все заправки топлива и Ad-Blue. НЕ СУММИРУЕМ — заправку каждого бака вписываем отдельно. В Trimble тоже ничего не суммируем: сколько позиций на чеке, столько должно быть позиций в Trimble. Все чеки должны быть вписаны в Trimble, не только топливо. Если не выдали чек за топливо — пометка в карте «brak paragonu» и ввод в Trimble. Вписываем дату, количество литров, полный бак или нет, километраж, какой картой заплатили.",
+ "Заправку холодильника вписываем отдельно, берём отдельный чек. В Trimble вписываем как «paliwo», на чеке подписываем «chłodnia».",
+ "Если на чеке не указана сумма — не оставляем в Trimble пустой графы, вписываем «1».",
+ "У вас будет две/три карты: VISA и Mastercard. Все покупки этими картами вписываете в таблицу: дата — за что заплатили — какой картой — сумма. ВАЖНО! Если оплачиваете этими картами в Польше — обязательно нужно взять FAKTURA VAT. Если не выдали чек — нужно написать объяснительную (oświadczenie). Если покупаете своей картой или своими наличными — тоже пишем в таблицу: дату, за что заплатили, сумму, имя и фамилию водителя. Если снимаете наличные с карты фирмы, это тоже необходимо указать (либо оставляете их себе и мы вычитаем их из диеты, либо возвращаете вместе со всеми документами).",
+ "На каждый расход должен быть документ: чек, фактура или oświadczenie, с актуальной датой, страной, суммой, литрами. Все чеки должны быть вписаны в Trimble. Чеки лучше скрепить и сложить вместе с картой в отдельный файлик, CMR-ки — в отдельный файлик."
+];
+function renderInfo(){
+  $("#pane-info").innerHTML = `<div class="card"><h3>Дорожная карта. Инструкция по выполнению</h3>
+    <ul class="instr">${INSTR.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
+    <label class="f" style="margin-top:10px"><span>Печатать инструкцию 4-й страницей</span>
+      <select data-p="printInstr" data-bool="1">
+        <option value="0"${C.printInstr?"":" selected"}>нет</option>
+        <option value="1"${C.printInstr?" selected":""}>да</option>
+      </select></label></div>
+  <div class="card"><h3>Как это работает</h3><p class="hint">
+    Всё сохраняется прямо в телефоне — интернет не нужен. Кнопки «Сег.», «Сейч.» и «Сейчас» подставляют дату и время.
+    Кнопка GPS определяет страну по координатам офлайн, а если есть сеть — подтягивает и город.<br><br>
+    Печать: «Печать / PDF» → в Safari выбираете принтер или «Сохранить в Файлы» (PDF). Бланк печатается 1-в-1 как оригинал.<br><br>
+    Чтобы открывалось в один тап: откройте файл в Safari → «Поделиться» → «На экран "Домой"».</p></div>`;
+}
+
+function renderAll(){ renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderInfo(); renderCards(); }
+function renderCards(){
+  $("#cardSel").innerHTML = DB.cards.map(c=>`<option value="${c.id}"${c.id===DB.active?" selected":""}>${esc(c.name)}</option>`).join("");
+}
+
+/* ================= ПЕЧАТЬ: точная копия бланка ================= */
+function pad(list,n,mk){ const a = list.slice(0,n).map(x=>x); while(a.length<n) a.push(mk()); return a; }
+const D = "……………";
+
+function printPage1(){
+  const h=C.head,b=C.bus,z=C.baza,s=C.stany;
+  const rows = pad(C.trasa, LIMITS.trasa, blank.trasa).map(r=>`<tr>
+    <td class="val c">${esc(r.nr)}</td><td class="val c">${esc(r.zk)}</td><td class="val">${esc(r.zm)}</td>
+    <td class="val c">${esc(fmtDT(r.zd,r.zg,true))||"/"}</td><td class="val c">${esc(r.zl)}</td>
+    <td class="val c">${esc(r.wk)}</td><td class="val">${esc(r.wm)}</td>
+    <td class="val c">${esc(fmtDT(r.wd,r.wg,true))||"/"}</td><td class="val c">${esc(r.wl)}</td>
+    <td class="val c">${esc(r.waga)}</td></tr>`).join("");
+  return `<div class="page">
+  <table>
+    <tr>
+      <td class="b c" style="width:13%">Numer Wyjazdu<div class="val">${esc(h.nrWyjazdu)}</div></td>
+      <td class="b c" style="width:13%">Numer Teczki<div class="val">${esc(h.nrTeczki)}</div></td>
+      <td style="width:20%"><div class="b c">Samochód</div><div>Nr rej: <span class="val">${esc(h.nrRej)}</span></div><div>Rodzaj paliwa: <b>${esc(h.paliwo)}</b></div></td>
+      <td style="width:27%"><div class="b c">Kierowca 1</div><div>Imię: <span class="val">${esc(h.k1i)}</span></div><div>Nazwisko: <span class="val">${esc(h.k1n)}</span></div></td>
+      <td style="width:27%"><div class="b c">Kierowca 2</div><div>Imię: <span class="val">${esc(h.k2i)}</span></div><div>Nazwisko: <span class="val">${esc(h.k2n)}</span></div></td>
+    </tr>
+  </table>
+  <table>
+    <tr>
+      <td class="b" style="width:16%">Wyjazd Busem z bazy</td>
+      <td style="width:17%">Data<span class="val">${esc(fmtD(b.wyjD))||D}</span></td>
+      <td style="width:17%">Godzina<span class="val">${esc(b.wyjG)||D}</span></td>
+      <td class="b" style="width:16%">Powrót Busem do Bazy</td>
+      <td style="width:17%">Data<span class="val">${esc(fmtD(b.powrD))||D}</span></td>
+      <td style="width:17%">Godzina<span class="val">${esc(b.powrG)||D}</span></td>
+    </tr>
+    <tr>
+      <td class="b">Przyjazd Busem do samochodu</td>
+      <td>Data<span class="val">${esc(fmtD(b.przyjSamD))||D}</span></td>
+      <td>Godzina<span class="val">${esc(b.przyjSamG)||D}</span></td>
+      <td class="b">Przyjazd Busem do bazy</td>
+      <td>Data<span class="val">${esc(fmtD(b.przyjBazD))||D}</span></td>
+      <td>Godzina<span class="val">${esc(b.przyjBazG)||D}</span></td>
+    </tr>
+    <tr>
+      <td class="b">Miejscowość</td><td colspan="2" class="val">${esc(b.miejsL)}</td>
+      <td class="b">Miejscowość</td><td colspan="2" class="val">${esc(b.miejsP)}</td>
+    </tr>
+  </table>
+  <table>
+    <tr><td class="b c" colspan="2" style="width:50%">WYJAZD Z BAZY</td><td class="b c" colspan="2">POWRÓT NA BAZĘ</td></tr>
+    <tr>
+      <td style="width:25%">Data: <span class="val">${esc(fmtD(z.wyjD))||D}</span></td>
+      <td style="width:25%">Godzina: <span class="val">${esc(z.wyjG)||D}</span></td>
+      <td style="width:25%">Data: <span class="val">${esc(fmtD(z.powrD))||D}</span></td>
+      <td style="width:25%">Godzina: <span class="val">${esc(z.powrG)||D}</span></td>
+    </tr>
+  </table>
+  <div class="decl">ROZLICZENIE DELEGACJI, TYLKO PO POPRAWNYM WYPEŁNIENIU KARTY DROGOWEJ</div>
+  <div class="h1" style="font-size:11pt;margin:2px 0 4px">Stany Samochodu</div>
+  <table class="nb"><tr><td class="c i" style="width:50%">Stan licznika KM</td><td class="c i">Stan Paliwa</td></tr></table>
+  <table>
+    <tr><td class="c i" style="width:25%">Początek</td><td class="c i" style="width:25%">Koniec</td>
+        <td class="c i" style="width:25%">Początek</td><td class="c i" style="width:25%">Koniec</td></tr>
+    <tr><td class="c val">${esc(s.kmP)}</td><td class="c val">${esc(s.kmK)}</td>
+        <td class="c val">${esc(s.palP)}</td><td class="c val">${esc(s.palK)}</td></tr>
+    <tr><td class="c i b" colspan="2">Stan licznika zużycia paliwa z komputera</td><td class="c i b" colspan="2">Stan Ad-Blu</td></tr>
+    <tr><td class="c i">Początek</td><td class="c i">Koniec</td><td class="c i">Początek</td><td class="c i">Koniec</td></tr>
+    <tr><td class="c val">${esc(s.kompP)}</td><td class="c val">${esc(s.kompK)}</td>
+        <td class="c val">${esc(s.adbP)}</td><td class="c val">${esc(s.adbK)}</td></tr>
+  </table>
+  <div class="h1" style="margin:8px 0 3px;font-size:11pt">TRASA</div>
+  <table class="trasa">
+    <tr><th colspan="5">ZAŁADUNEK/</th><th colspan="4">WYŁADUNEK</th><th rowspan="2" style="width:9%">WAGA ŁADUNKU</th></tr>
+    <tr><th style="width:7%">Nr zlec</th><th style="width:6%">Kraj</th><th style="width:13%">Miasto</th><th style="width:12%">Data / Godz.</th><th style="width:9%">Stan licznika</th>
+        <th style="width:6%">Kraj</th><th style="width:13%">Miasto</th><th style="width:12%">Data / Godz.</th><th style="width:9%">Stan licznika</th></tr>
+    ${rows}
+  </table></div>`;
+}
+
+function printPage2(){
+  const tr = r=>`<td class="val c">${esc(fmtD(r.d,true))}</td><td class="val c">${esc(r.kraj)}</td><td class="val c">${esc(r.karta)}</td>
+    <td class="val c">${esc(r.litry)}</td><td class="val c">${esc(r.pelna)}</td><td class="val c">${esc(r.licznik)}</td><td class="val c">${esc(r.paragon)}</td>`;
+  const head = `<tr><th style="width:6%">Lp.</th><th style="width:15%">Data tankowania</th><th style="width:9%">Kraj</th>
+    <th style="width:14%">Rodzaj karty</th><th style="width:17%">Zatankowane litry</th><th style="width:13%">Czy do pełna ?<br>(tak / nie)</th>
+    <th style="width:12%">Stan licznika</th><th style="width:14%">Czy jest paragon ?<br>(tak / nie)</th></tr>`;
+  const on = pad(C.tankON,LIMITS.tankON,blank.tank).map((r,i)=>`<tr><td class="c">${i+1}</td>${tr(r)}</tr>`).join("");
+  const ad = pad(C.tankAd,LIMITS.tankAd,blank.tank).map((r,i)=>`<tr><td class="c">${i+1}</td>${tr(r)}</tr>`).join("");
+  const ch = pad(C.tankChl,LIMITS.tankChl,blank.tankChl).map((r,i)=>`<tr><td class="c">${i+1}.</td>
+    <td class="val c">${esc(fmtD(r.d,true))}</td><td class="val c">${esc(r.kraj)}</td><td class="val c">${esc(r.karta)}</td>
+    <td class="val c">${esc(r.rej)}</td><td class="val c">${esc(r.mgP)}</td><td class="val c">${esc(r.mgK)}</td>
+    <td class="val c">${esc(r.litry)}</td></tr>`).join("");
+  return `<div class="page">
+    <div class="h1">KARTA TANKOWAŃ</div>
+    <div class="h2">TANKOWANIA CIĄGNIKA ON :</div>
+    <table class="tank">${head}${on}</table>
+    <div class="h2">TANKOWANIA ADBLUE</div>
+    <table class="tank">${head}${ad}</table>
+    <div class="h2">TANKOWANIA CHŁODNI</div>
+    <table class="tank">
+      <tr><th rowspan="2" style="width:6%">Lp.</th><th rowspan="2" style="width:15%">Data tankowania</th><th rowspan="2" style="width:9%">Kraj</th>
+          <th rowspan="2" style="width:14%">Rodzaj karty</th><th rowspan="2" style="width:15%">Numer rej. chłodni</th>
+          <th colspan="2" style="width:24%">Liczba motogodzin</th><th rowspan="2" style="width:17%">Zatankowane litry</th></tr>
+      <tr><th>Początek</th><th>Koniec</th></tr>
+      ${ch}
+    </table></div>`;
+}
+
+function printPage3(){
+  const dl = (v,n)=> v? esc(v) : ".".repeat(n);
+  const zak = pad(C.zakupy,LIMITS.zakupy,blank.zakupy).map((r,i)=>
+    `<div>${i+1}. Za co: ${dl(r.co,52)} Data: ${dl(fmtD(r.d,true),10)} Bank: ${dl(r.bank,10)} Kwota: ${dl(r.kwota,9)} Kraj: ${dl(r.kraj,5)}</div>`).join("");
+  const lst = (list,n)=> pad(C[list],LIMITS[list],blank.oplaty).map((r,i)=>
+    `<div>${i+1}. Za co: ${dl(r.co,n)} Data: ${dl(fmtD(r.d,true),10)} Rodzaj karty: ${dl(r.karta,16)} Kwota: ${dl(r.kwota,9)} Kraj: ${dl(r.kraj,7)}</div>`).join("");
+  const wl = pad(C.wlasne,LIMITS.wlasne,blank.wlasne).map((r,i)=>
+    `<div>${i+1}. Za co: ${dl(r.co,20)} Data: ${dl(fmtD(r.d,true),12)} Kwota ${dl(r.kwota,14)} Kraj: ${dl(r.kraj,14)} Kierowca: ${dl(r.kier,12)}</div>`).join("");
+  return `<div class="page">
+    <div class="h1" style="font-size:11pt">DODATKOWE ZAKUPY KARTĄ BANKOWĄ LUB GOTÓWKĄ</div>
+    <div class="lines">${zak}</div>
+    <div class="h1" style="font-size:11pt;margin-top:12px">OPŁATY DROGOWE/AUTOSTRADY/MOSTY/TUNELE</div>
+    <div class="lines">${lst("oplaty",22)}</div>
+    <div class="h1" style="font-size:11pt;margin-top:12px">SERWISY/NAPRAWY</div>
+    <div class="lines">${lst("serwisy",56)}</div>
+    <div class="h1" style="font-size:11pt;margin-top:12px">MANDATY</div>
+    <div class="lines">${lst("mandaty",30)}</div>
+    <div class="h1" style="font-size:11pt;margin-top:12px">ZAKUPY WŁASNĄ KARTĄ LUB GOTÓWKĄ</div>
+    <div class="lines">${wl}</div>
+    <div class="h1" style="font-size:11pt;margin-top:12px">DODATKOWE UWAGI</div>
+    <div class="lines" style="min-height:22mm"><div style="white-space:pre-wrap">${esc(C.uwagi)}</div></div>
+    <div class="note">*Na każdy wydatek powinien być paragon. Na każdy wydatek w Polsce zapłacony kartą bankową (Visa, Mastercard)
+      powinna być faktura wystawiona na firmę TAJ. W przypadku braku paragonu należy wypisać oświadczenie.</div>
+    ${sigBlock()}
+  </div>`;
+}
+
+function sigBlock(extraStyle){
+  const im = v => v ? `<img src="${v}" alt="">` : "";
+  return `<div class="sig"${extraStyle?` style="${extraStyle}"`:""}>
+    <div>Pierwszy kierowca<div class="sigbox">${im(C.sig.k1)}</div><u>…………………………………</u></div>
+    <div>Drugi kierowca<div class="sigbox">${im(C.sig.k2)}</div><u>…………………………………</u></div></div>`;
+}
+
+function printPage4(){
+  return `<div class="page rus">
+    <div class="h1" style="font-family:Arial,Helvetica,sans-serif;font-size:11pt">ДОРОЖНАЯ КАРТА. ИНСТРУКЦИЯ ПО ВЫПОЛНЕНИЮ.</div>
+    <ul>${INSTR.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
+    ${sigBlock("font-family:Arial,Helvetica,sans-serif")}
+  </div>`;
+}
+
+function buildPrint(){
+  $("#print").innerHTML = printPage1() + printPage2() + printPage3() + (C.printInstr? printPage4() : "");
+}
+
+/* ================= События ================= */
+document.addEventListener("input", e=>{
+  const el = e.target.closest("[data-p]"); if(!el) return;
+  let v = el.value;
+  if(el.dataset.bool) v = v==="1";
+  if(el.dataset.p === "printInstr") v = el.value==="1";
+  setP(C, el.dataset.p, v); save();
+});
+document.addEventListener("change", e=>{
+  const el = e.target.closest("[data-p]"); if(!el) return;
+  let v = el.value; if(el.dataset.p==="printInstr") v = el.value==="1";
+  setP(C, el.dataset.p, v); save();
+});
+
+document.addEventListener("click", async e=>{
+  const t = e.target.closest("button, .tab"); if(!t) return;
+
+  if(t.dataset.tab){ activeTab = t.dataset.tab; renderTabs();
+    if(activeTab==="main") initSigs();
+    window.scrollTo({top:0}); return; }
+
+  if(t.dataset.now){
+    const [kind,p1,p2] = t.dataset.now.split("|");
+    if(kind==="d") setP(C,p1,todayISO());
+    if(kind==="t") setP(C,p1,nowHM());
+    if(kind==="dt"){ setP(C,p1,todayISO()); setP(C,p2,nowHM()); }
+    const box = t.closest("label") || t.closest(".row2");
+    box.querySelectorAll("input").forEach(i=>{ const p=i.dataset.p; if(p) i.value = getP(C,p)||""; });
+    save(); toast("Дата и время подставлены"); return;
+  }
+
+  if(t.dataset.gps){
+    const [pk,pm] = t.dataset.gps.split("|");
+    const old = t.textContent; t.textContent="…"; t.disabled=true;
+    try{
+      const r = await placeNow();
+      if(pk) setP(C,pk,r.kraj);
+      if(pm && r.city) setP(C,pm,r.city);
+      const box = t.closest("label")||t.closest(".row2");
+      box.querySelectorAll("input").forEach(i=>{ const p=i.dataset.p; if(p) i.value = getP(C,p)||""; });
+      save();
+      toast(r.city ? `${r.kraj}, ${r.city}` : (r.kraj? `Страна: ${r.kraj}` : "Страна не определена"));
+    }catch(err){
+      toast("Нет доступа к геолокации");
+    }
+    t.textContent=old; t.disabled=false; return;
+  }
+
+  if(t.dataset.sigclear){
+    setP(C, t.dataset.sigclear, ""); save(); renderMain(); toast("Подпись очищена"); return;
+  }
+
+  if(t.dataset.add){
+    const list = t.dataset.add;
+    if(C[list].length >= LIMITS[list]){ toast(`На бланке ${LIMITS[list]} строк — больше не влезет`); return; }
+    const mk = list==="trasa"?blank.trasa : (list==="tankON"||list==="tankAd")?blank.tank :
+               list==="tankChl"?blank.tankChl : list==="zakupy"?blank.zakupy :
+               list==="wlasne"?blank.wlasne : blank.oplaty;
+    C[list].push(mk()); save();
+    if(list==="trasa") renderTrasa(); else if(list.startsWith("tank")) renderTank(); else renderKoszty();
+    return;
+  }
+
+  if(t.dataset.del){
+    const [list,i] = t.dataset.del.split("|");
+    if(!confirm("Удалить запись?")) return;
+    C[list].splice(+i,1); save();
+    if(list==="trasa") renderTrasa(); else if(list.startsWith("tank")) renderTank(); else renderKoszty();
+    return;
+  }
+
+  switch(t.id){
+    case "btnPrint": buildPrint(); setTimeout(()=>window.print(),120); break;
+    case "btnPreview": buildPrint(); document.body.classList.toggle("preview");
+      if(document.body.classList.contains("preview")){ t.textContent="Закрыть просмотр"; window.scrollTo({top:0}); }
+      else t.textContent="Предпросмотр"; break;
+    case "btnNew": { const n = prompt("Название новой карты:", "Karta " + new Date().toLocaleDateString("ru-RU"));
+      if(n===null) return; const c = newCard(n.trim()); DB.cards.push(c); DB.active=c.id; C=c; save(true); renderAll(); toast("Карта создана"); break; }
+    case "btnRename": { const n = prompt("Название карты:", C.name); if(n===null) return; C.name=n.trim()||C.name; save(true); renderCards(); break; }
+    case "btnDel": { if(DB.cards.length<2){ toast("Это единственная карта"); return; }
+      if(!confirm(`Удалить «${C.name}»? Данные пропадут.`)) return;
+      DB.cards = DB.cards.filter(c=>c.id!==C.id); C = DB.cards[0]; DB.active=C.id; save(true); renderAll(); break; }
+    case "btnExport": {
+      const blob = new Blob([JSON.stringify(C,null,2)],{type:"application/json"});
+      const a = document.createElement("a"); a.href=URL.createObjectURL(blob);
+      a.download = C.name.replace(/[^\w\-\.]+/g,"_") + ".json"; a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),3000); break; }
+    case "btnImport": $("#fileIn").click(); break;
+  }
+});
+
+$("#cardSel").addEventListener("change", e=>{
+  const c = DB.cards.find(x=>x.id===e.target.value); if(!c) return;
+  DB.active=c.id; C=c; save(true); renderAll(); window.scrollTo({top:0});
+});
+
+$("#fileIn").addEventListener("change", e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{ try{
+      const c = JSON.parse(r.result); c.id = uid(); c.name = (c.name||"Импорт") + " (импорт)";
+      const base = newCard(); DB.cards.push(Object.assign(base, c, {id:c.id}));
+      DB.active = c.id; C = DB.cards[DB.cards.length-1]; save(true); renderAll(); toast("Карта загружена");
+    }catch(err){ toast("Файл не читается"); } };
+  r.readAsText(f); e.target.value="";
+});
+
+window.addEventListener("beforeprint", buildPrint);
+
+/* ================= Офлайн ================= */
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+}
+
+/* ================= Старт ================= */
+(async function init(){
+  const raw = await Store.get(KEY);
+  if(raw){ try{ DB = JSON.parse(raw); }catch(e){ DB={cards:[],active:""}; } }
+  if(!DB.cards || !DB.cards.length){ const c=newCard(); DB={cards:[c], active:c.id}; }
+  C = DB.cards.find(c=>c.id===DB.active) || DB.cards[0];
+  DB.active = C.id;
+  // добить недостающие поля после обновлений
+  const base = newCard(); for(const k in base){ if(C[k]===undefined) C[k]=base[k]; }
+  renderAll();
+  $("#saveState").textContent = "готово";
+})();
+</script>
+</body>
+</html>
