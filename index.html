@@ -101,17 +101,17 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
   background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
 
 /* ================= PRINT SHEET (точная копия бланка) ================= */
-#print{display:none;background:#fff;color:#000}
-body.preview #print{display:block;padding:10px 0}
+#print{position:absolute;left:-99999px;top:0;width:718px;background:#fff;color:#000}
+body.preview #print{position:static;left:auto;padding:10px 0}
 body.preview main,body.preview nav,body.preview header{display:none}
-.page{
-  width:210mm;min-height:296mm;background:#fff;margin:0 auto 8px;padding:8mm 7mm;
+.page{width:718px;height:1000px;overflow:hidden;background:#fff;margin:0 auto 10px}
+.sheet{
+  width:718px;min-height:1000px;background:#fff;
   font-family:"Times New Roman",Times,serif;color:#000;
-  display:flex;flex-direction:column;
+  display:flex;flex-direction:column;transform-origin:top left;
 }
-.page + .page{page-break-before:always}
-.page table{border-collapse:collapse;width:100%;table-layout:fixed}
-.page td,.page th{border:1px solid #000;padding:1px 3px;vertical-align:middle;font-size:9pt;line-height:1.15;word-wrap:break-word}
+.sheet table{border-collapse:collapse;width:100%;table-layout:fixed}
+.sheet td,.sheet th{border:1px solid #000;padding:1px 3px;vertical-align:middle;font-size:9pt;line-height:1.15;word-wrap:break-word}
 .b{font-weight:bold}
 .c{text-align:center}
 .i{font-style:italic}
@@ -140,11 +140,11 @@ body.preview main,body.preview nav,body.preview header{display:none}
 .rus li{margin-bottom:2.4mm;text-align:justify}
 @media print{
   header,nav,main,.toast{display:none!important}
-  #print{display:block!important}
   body{background:#fff}
-  .page{width:auto;min-height:0;height:279mm;overflow:hidden;margin:0;padding:0;page-break-after:always;break-after:page}
+  #print{position:static!important;left:auto!important;top:auto!important;padding:0!important;zoom:1!important}
+  .page{margin:0;page-break-after:always;break-after:page;page-break-inside:avoid;break-inside:avoid}
   .page:last-child{page-break-after:auto;break-after:auto}
-  @page{size:A4 portrait;margin:9mm 8mm}
+  @page{size:A4 portrait;margin:10mm 10mm 12mm}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -559,7 +559,7 @@ function printPage1(){
     <td class="val c">${esc(r.wk)}</td><td class="val">${esc(r.wm)}</td>
     <td class="val c">${esc(fmtDT(r.wd,r.wg,true))||"/"}</td><td class="val c">${esc(r.wl)}</td>
     <td class="val c">${esc(r.waga)}</td></tr>`).join("");
-  return `<div class="page">
+  return `<div class="sheet">
   <table>
     <tr>
       <td class="b c" style="width:13%">Numer Wyjazdu<div class="val">${esc(h.nrWyjazdu)}</div></td>
@@ -634,7 +634,7 @@ function printPage2(){
     <td class="val c">${esc(fmtD(r.d,true))}</td><td class="val c">${esc(r.kraj)}</td><td class="val c">${esc(r.karta)}</td>
     <td class="val c">${esc(r.rej)}</td><td class="val c">${esc(r.mgP)}</td><td class="val c">${esc(r.mgK)}</td>
     <td class="val c">${esc(r.litry)}</td></tr>`).join("");
-  return `<div class="page">
+  return `<div class="sheet">
     <div class="h1">KARTA TANKOWAŃ</div>
     <div class="h2">TANKOWANIA CIĄGNIKA ON :</div>
     <table class="tank">${head}${on}</table>
@@ -658,7 +658,7 @@ function printPage3(){
     `<div>${i+1}. Za co: ${dl(r.co,n)} Data: ${dl(fmtD(r.d,true),10)} Rodzaj karty: ${dl(r.karta,16)} Kwota: ${dl(r.kwota,9)} Kraj: ${dl(r.kraj,7)}</div>`).join("");
   const wl = pad(C.wlasne,LIMITS.wlasne,blank.wlasne).map((r,i)=>
     `<div>${i+1}. Za co: ${dl(r.co,20)} Data: ${dl(fmtD(r.d,true),12)} Kwota ${dl(r.kwota,14)} Kraj: ${dl(r.kraj,14)} Kierowca: ${dl(r.kier,12)}</div>`).join("");
-  return `<div class="page">
+  return `<div class="sheet">
     <div class="h1" style="font-size:11pt">DODATKOWE ZAKUPY KARTĄ BANKOWĄ LUB GOTÓWKĄ</div>
     <div class="lines">${zak}</div>
     <div class="h1" style="font-size:11pt;margin-top:12px">OPŁATY DROGOWE/AUTOSTRADY/MOSTY/TUNELE</div>
@@ -685,7 +685,7 @@ function sigBlock(extraStyle){
 }
 
 function printPage4(){
-  return `<div class="page rus">
+  return `<div class="sheet rus">
     <div class="h1" style="font-family:Arial,Helvetica,sans-serif;font-size:11pt">ДОРОЖНАЯ КАРТА. ИНСТРУКЦИЯ ПО ВЫПОЛНЕНИЮ.</div>
     <ul>${INSTR.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
     ${sigBlock("font-family:Arial,Helvetica,sans-serif")}
@@ -693,7 +693,25 @@ function printPage4(){
 }
 
 function buildPrint(){
-  $("#print").innerHTML = printPage1() + printPage2() + printPage3() + printPage4();
+  const pages = [printPage1(), printPage2(), printPage3(), printPage4()];
+  $("#print").innerHTML = pages.map(p => `<div class="page">${p}</div>`).join("");
+  fitPages();
+}
+
+/* Каждый лист ужимается ровно под один A4, чтобы всегда было 4 страницы */
+const BOX_W = 718, BOX_H = 1000;
+function fitPages(){
+  document.querySelectorAll("#print .sheet").forEach(sh=>{
+    let s = 1;
+    for(let i=0; i<6; i++){
+      sh.style.width = (BOX_W/s) + "px";
+      sh.style.minHeight = (BOX_H/s) + "px";
+      sh.style.transform = s < 1 ? `scale(${s})` : "none";
+      const h = sh.scrollHeight, need = BOX_H/s;
+      if(h <= need + 1) break;
+      s = s * (need/h) * 0.995;
+    }
+  });
 }
 
 /* ================= События ================= */
@@ -770,8 +788,10 @@ document.addEventListener("click", async e=>{
   switch(t.id){
     case "btnPrint": buildPrint(); setTimeout(()=>window.print(),120); break;
     case "btnPreview": buildPrint(); document.body.classList.toggle("preview");
-      if(document.body.classList.contains("preview")){ t.textContent="Закрыть просмотр"; window.scrollTo({top:0}); }
-      else t.textContent="Предпросмотр"; break;
+      if(document.body.classList.contains("preview")){
+        $("#print").style.zoom = Math.min(1, (window.innerWidth-12)/BOX_W);
+        t.textContent="Закрыть просмотр"; window.scrollTo({top:0});
+      } else { $("#print").style.zoom = ""; t.textContent="Предпросмотр"; } break;
     case "btnNew": { const n = prompt("Название новой карты:", "Karta " + new Date().toLocaleDateString("ru-RU"));
       if(n===null) return; const c = newCard(n.trim()); DB.cards.push(c); DB.active=c.id; C=c; save(true); renderAll(); toast("Карта создана"); break; }
     case "btnRename": { const n = prompt("Название карты:", C.name); if(n===null) return; C.name=n.trim()||C.name; save(true); renderCards(); break; }
