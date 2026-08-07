@@ -85,6 +85,9 @@ textarea{min-height:90px;line-height:1.35}
 .count{color:var(--dim);font-size:12px;margin-left:auto}
 .add{width:100%;margin-top:6px;background:transparent;border:1px dashed var(--line);color:var(--amber);
   border-radius:12px;padding:12px;font-size:14px;font-weight:700;cursor:pointer}
+.bkwarn{margin:10px 12px 0;padding:11px 12px;border-radius:12px;background:#3A2A12;border:1px solid #6B4E1C;
+  color:#F2D9A6;font-size:13px;line-height:1.45;display:flex;gap:10px;align-items:center}
+.bkwarn button{flex:0 0 auto;background:var(--amber);color:#1a1206;border:none;border-radius:9px;padding:9px 12px;font-weight:700;font-size:13px}
 .toast{
   position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom));
   background:var(--green);color:#06210f;padding:10px 16px;border-radius:99px;font-weight:700;font-size:14px;
@@ -139,7 +142,10 @@ body.preview main,body.preview nav,body.preview header{display:none}
 .rus ul{margin:2mm 0 0;padding-left:6mm}
 .rus li{margin-bottom:2.4mm;text-align:justify}
 @media print{
-  header,nav,main,.toast{display:none!important}
+  header,nav,main,.bkwarn{margin:10px 12px 0;padding:11px 12px;border-radius:12px;background:#3A2A12;border:1px solid #6B4E1C;
+  color:#F2D9A6;font-size:13px;line-height:1.45;display:flex;gap:10px;align-items:center}
+.bkwarn button{flex:0 0 auto;background:var(--amber);color:#1a1206;border:none;border-radius:9px;padding:9px 12px;font-weight:700;font-size:13px}
+.toast{display:none!important}
   body{background:#fff}
   #print{position:static!important;left:auto!important;top:auto!important;padding:0!important;zoom:1!important}
   .page{margin:0;page-break-after:always;break-after:page;page-break-inside:avoid;break-inside:avoid}
@@ -152,19 +158,21 @@ body.preview main,body.preview nav,body.preview header{display:none}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v6</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v7</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPreview">Предпросмотр</button>
     <select id="cardSel" style="width:auto;min-width:150px;padding:9px 30px 9px 10px;font-size:14px"></select>
     <button class="btn" id="btnNew">Новая карта</button>
     <button class="btn ghost" id="btnRename">Переименовать</button>
+    <button class="btn" id="btnShare">Копия ⤴</button>
     <button class="btn ghost" id="btnExport">Экспорт</button>
     <button class="btn ghost" id="btnImport">Импорт</button>
     <button class="btn ghost danger" id="btnDel">Удалить</button>
   </div>
 </header>
 
+<div id="bkWarn" class="bkwarn" style="display:none"></div>
 <nav id="tabs"></nav>
 <main>
   <section class="pane" id="pane-main"></section>
@@ -195,6 +203,8 @@ const Store = {
   }
 };
 const KEY = "kd_v1";
+const SNAP = "kd_snap_v1";   // копии внутри устройства
+const LASTB = "kd_lastb_v1";  // когда последний раз выгружали файл
 
 /* ================= Модель ================= */
 const LIMITS = {trasa:30, tankON:17, tankAd:9, tankChl:3, zakupy:10, oplaty:10, serwisy:5, mandaty:3, wlasne:3};
@@ -246,6 +256,7 @@ function save(now){
   clearTimeout(saveT);
   const go = async ()=>{
     await Store.set(KEY, JSON.stringify(DB));
+    snapshot();
     $("#saveState").textContent = "сохранено " + nowHM();
   };
   if(now) go(); else saveT = setTimeout(go, 400);
@@ -535,6 +546,14 @@ function renderInfo(){
   $("#pane-info").innerHTML = `<div class="card"><h3>Дорожная карта. Инструкция по выполнению</h3>
     <ul class="instr">${INSTR.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
     <p class="hint">Эта страница всегда печатается 4-й — как в оригинальном комплекте.</p></div>
+
+  <div class="card"><h3>Резервные копии</h3>
+    <p class="hint" id="bkState">—</p>
+    <button class="add" id="btnShare2">Сохранить копию сейчас</button>
+    <div class="sub">Копии внутри устройства</div>
+    <div id="snapList"><p class="hint">—</p></div>
+    <p class="hint">Раз в сутки приложение само кладёт файл копии в Загрузки. Кнопка «Копия ⤴» вверху отправляет его в облако или мессенджер одним тапом — это единственное, что спасёт данные, если устройство пропадёт.</p>
+  </div>
   <div class="card"><h3>Как это работает</h3><p class="hint">
     Всё сохраняется прямо в телефоне — интернет не нужен. Кнопки «Сег.», «Сейч.» и «Сейчас» подставляют дату и время.
     Кнопка GPS определяет страну по координатам офлайн, а если есть сеть — подтягивает и город.<br><br>
@@ -542,7 +561,37 @@ function renderInfo(){
     Чтобы открывалось в один тап: откройте файл в Safari → «Поделиться» → «На экран "Домой"».</p></div>`;
 }
 
-function renderAll(){ renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderInfo(); renderCards(); }
+function renderAll(){ renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderInfo(); renderCards(); fillBackupInfo(); }
+
+async function fillBackupInfo(){
+  const st = $("#bkState"); const list = $("#snapList");
+  if(!st || !list) return;
+  const d = daysSinceBackup();
+  st.textContent = !lastBackupTs ? "Копия ещё ни разу не сохранялась."
+    : (d === 0 ? "Последняя копия — сегодня." : `Последняя копия — ${d} дн. назад.`);
+  let box = {items:[]};
+  try{ const raw = await Store.get(SNAP); if(raw) box = JSON.parse(raw); }catch(e){}
+  if(!box.items || !box.items.length){ list.innerHTML = '<p class="hint">Пока нет.</p>'; return; }
+  list.innerHTML = box.items.map((it,i)=>{
+    const dt = new Date(it.t);
+    const when = dt.toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+    return `<div class="item"><div class="ihead"><b>${when}</b>
+      <button class="mini" style="margin-left:auto" data-snap="${i}">Восстановить</button></div></div>`;
+  }).join("");
+}
+
+async function restoreSnap(i){
+  if(!confirm("Восстановить состояние из копии? Текущие карты будут заменены.")) return;
+  try{
+    const raw = await Store.get(SNAP); const box = JSON.parse(raw);
+    const item = box.items[i]; if(!item) return;
+    await snapshot();
+    DB = JSON.parse(item.data);
+    C = DB.cards.find(c=>c.id===DB.active) || DB.cards[0];
+    DB.active = C.id;
+    save(true); renderAll(); toast("Восстановлено");
+  }catch(e){ toast("Не удалось восстановить"); }
+}
 function renderCards(){
   $("#cardSel").innerHTML = DB.cards.map(c=>`<option value="${c.id}"${c.id===DB.active?" selected":""}>${esc(c.name)}</option>`).join("");
 }
@@ -716,6 +765,90 @@ function fitPages(){
   });
 }
 
+/* ================= Резервные копии ================= */
+const DAY = 86400000;
+
+// Снимок всех карт внутри устройства (хранится 3 последних)
+async function snapshot(){
+  try{
+    let box = {items:[]};
+    const raw = await Store.get(SNAP);
+    if(raw){ try{ box = JSON.parse(raw); }catch(e){} }
+    const now = Date.now();
+    const last = box.items[0];
+    if(last && (now - last.t) < 6*3600000) box.items.shift(); // не чаще раза в 6 часов
+    box.items.unshift({t: now, data: JSON.stringify(DB)});
+    box.items = box.items.slice(0,3);
+    await Store.set(SNAP, JSON.stringify(box));
+  }catch(e){}
+}
+
+function backupBlob(){
+  return new Blob([JSON.stringify(DB, null, 2)], {type:"application/json"});
+}
+function backupName(){ return "karta-" + todayISO() + ".json"; }
+
+async function saveBackupFile(silent){
+  try{
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(backupBlob());
+    a.download = backupName();
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    await Store.set(LASTB, String(Date.now()));
+    if(!silent) toast("Копия сохранена в Загрузки");
+    renderWarn();
+    return true;
+  }catch(e){ return false; }
+}
+
+// Отправить копию в облако/мессенджер одним тапом
+async function shareBackup(){
+  const file = new File([backupBlob()], backupName(), {type:"application/json"});
+  try{
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:"Karta drogowa — копия"});
+      await Store.set(LASTB, String(Date.now()));
+      renderWarn();
+      return;
+    }
+  }catch(e){ if(e && e.name === "AbortError") return; }
+  saveBackupFile();
+}
+
+let lastBackupTs = 0;
+async function loadBackupState(){
+  const v = await Store.get(LASTB);
+  lastBackupTs = v ? Number(v) : 0;
+}
+function daysSinceBackup(){
+  if(!lastBackupTs) return 999;
+  return Math.floor((Date.now() - lastBackupTs) / DAY);
+}
+function hasData(){
+  return DB.cards.some(c => c.trasa.length || c.tankON.length || c.head.nrWyjazdu || c.baza.wyjD);
+}
+function renderWarn(){
+  const el = $("#bkWarn");
+  if(!el) return;
+  const d = daysSinceBackup();
+  if(!hasData() || d < 3){ el.style.display = "none"; return; }
+  el.style.display = "flex";
+  el.innerHTML = `<div>Копии карты нет ${d>90?"ни разу":"уже "+d+" дн."}. Если планшет пропадёт — данные пропадут вместе с ним.</div>
+    <button id="warnBk">Сделать</button>`;
+}
+
+// Раз в сутки сама выгружает файл в Загрузки
+async function maybeAutoBackup(){
+  await loadBackupState();
+  renderWarn();
+  if(!hasData()) return;
+  if(Date.now() - lastBackupTs > DAY){
+    const ok = await saveBackupFile(true);
+    if(ok){ lastBackupTs = Date.now(); toast("Копия сохранена в Загрузки"); }
+  }
+}
+
 /* ================= События ================= */
 document.addEventListener("input", e=>{
   const el = e.target.closest("[data-p]"); if(!el) return;
@@ -764,6 +897,9 @@ document.addEventListener("click", async e=>{
     t.textContent=old; t.disabled=false; return;
   }
 
+  if(t.id === "warnBk" || t.id === "btnShare2"){ shareBackup(); return; }
+  if(t.dataset.snap !== undefined){ restoreSnap(+t.dataset.snap); return; }
+
   if(t.dataset.sigclear){
     setP(C, t.dataset.sigclear, ""); save(); renderMain(); toast("Подпись очищена"); return;
   }
@@ -800,11 +936,8 @@ document.addEventListener("click", async e=>{
     case "btnDel": { if(DB.cards.length<2){ toast("Это единственная карта"); return; }
       if(!confirm(`Удалить «${C.name}»? Данные пропадут.`)) return;
       DB.cards = DB.cards.filter(c=>c.id!==C.id); C = DB.cards[0]; DB.active=C.id; save(true); renderAll(); break; }
-    case "btnExport": {
-      const blob = new Blob([JSON.stringify(C,null,2)],{type:"application/json"});
-      const a = document.createElement("a"); a.href=URL.createObjectURL(blob);
-      a.download = C.name.replace(/[^\w\-\.]+/g,"_") + ".json"; a.click();
-      setTimeout(()=>URL.revokeObjectURL(a.href),3000); break; }
+    case "btnExport": saveBackupFile(); break;
+    case "btnShare": shareBackup(); break;
     case "btnImport": $("#fileIn").click(); break;
   }
 });
@@ -818,9 +951,19 @@ $("#fileIn").addEventListener("change", e=>{
   const f = e.target.files[0]; if(!f) return;
   const r = new FileReader();
   r.onload = ()=>{ try{
-      const c = JSON.parse(r.result); c.id = uid(); c.name = (c.name||"Импорт") + " (импорт)";
-      const base = newCard(); DB.cards.push(Object.assign(base, c, {id:c.id}));
-      DB.active = c.id; C = DB.cards[DB.cards.length-1]; save(true); renderAll(); toast("Карта загружена");
+      const data = JSON.parse(r.result);
+      const list = Array.isArray(data.cards) ? data.cards : [data];
+      let added = 0;
+      list.forEach(c=>{
+        const base = newCard();
+        const card = Object.assign(base, c, {id: uid()});
+        card.name = (c.name || "Импорт");
+        DB.cards.push(card); added++;
+      });
+      if(added){
+        C = DB.cards[DB.cards.length-1]; DB.active = C.id;
+        save(true); renderAll(); toast(added>1 ? `Загружено карт: ${added}` : "Карта загружена");
+      }
     }catch(err){ toast("Файл не читается"); } };
   r.readAsText(f); e.target.value="";
 });
@@ -851,6 +994,7 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   const base = newCard(); for(const k in base){ if(C[k]===undefined) C[k]=base[k]; }
   renderAll();
   $("#saveState").textContent = "готово";
+  maybeAutoBackup();
 })();
 </script>
 </body>
