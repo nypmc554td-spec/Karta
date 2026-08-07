@@ -159,7 +159,7 @@ body.preview main,body.preview nav,body.preview header{display:none}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v8</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v9</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPreview">Предпросмотр</button>
@@ -289,16 +289,33 @@ function gps(){
       e=>rej(e), {enableHighAccuracy:true, timeout:10000, maximumAge:60000});
   });
 }
+/* кириллица -> латиница (резерв, если у города нет латинского имени) */
+const TR={"а":"a","б":"b","в":"v","г":"h","ґ":"g","д":"d","е":"e","є":"ie","ж":"zh","з":"z","и":"y","і":"i","ї":"i","й":"i","к":"k","л":"l","м":"m","н":"n","о":"o","п":"p","р":"r","с":"s","т":"t","у":"u","ф":"f","х":"kh","ц":"ts","ч":"ch","ш":"sh","щ":"shch","ъ":"","ы":"y","ь":"","э":"e","ю":"iu","я":"ia","ё":"e"};
+function translit(s){
+  return s.split("").map(ch=>{
+    const low=ch.toLowerCase(), t=TR[low];
+    if(t===undefined) return ch;
+    return (ch===low) ? t : (t.charAt(0).toUpperCase()+t.slice(1));
+  }).join("");
+}
+
 async function placeNow(){
   const {lat,lon} = await gps();
   let kraj = countryByCoords(lat,lon), city = "";
   try{
     const ctl = new AbortController(); const t=setTimeout(()=>ctl.abort(),4500);
-    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&lat=${lat}&lon=${lon}`,{signal:ctl.signal});
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&namedetails=1&accept-language=en&lat=${lat}&lon=${lon}`,{signal:ctl.signal});
     clearTimeout(t);
-    if(r.ok){ const j = await r.json(); const a=j.address||{};
+    if(r.ok){ const j = await r.json(); const a=j.address||{}, n=j.namedetails||{};
       if(a.country_code) kraj = a.country_code.toUpperCase();
-      city = a.city||a.town||a.village||a.municipality||a.county||"";
+      /* 1) местное название (Warszawa, Munchen, Kosice) */
+      let c = n.name || "";
+      /* 2) если местное кириллицей (UA, BY, RS, BG, RU) — берём латиницу */
+      if(!c || /[\u0400-\u04FF]/.test(c)) c = n["name:pl"] || n["name:en"] || n["name:de"] || c;
+      /* 3) последний резерв — англ. поля адреса */
+      if(!c) c = a.city||a.town||a.village||a.municipality||a.county||"";
+      /* 4) если всё равно кириллица — транслит */
+      city = /[\u0400-\u04FF]/.test(c) ? translit(c) : c;
     }
   }catch(e){ /* офлайн — остаётся определение по координатам */ }
   return {kraj, city, lat, lon};
