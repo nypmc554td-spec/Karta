@@ -77,11 +77,12 @@ textarea{min-height:90px;line-height:1.35}
 }
 .mini:active{background:var(--panel2)}
 .item{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;margin:8px 0}
-.item[data-row].part{border-color:#6B4E1C;background:#241c10}
-.item[data-row].done{border-color:#2F6B3A;background:#12201a}
+/* мягкая заливка строк: жёлтая — не закрыта, зелёная — заполнено всё */
+.item[data-row].todo{background:rgba(214,158,46,.13);border-color:rgba(214,158,46,.32)}
+.item[data-row].done{background:rgba(56,161,105,.15);border-color:rgba(56,161,105,.36)}
 .rst{font-size:10px;font-weight:800;letter-spacing:.06em;padding:2px 8px;border-radius:999px;text-transform:uppercase}
-.rst.done{background:#1E5B2B;color:#CFEFD6}
-.rst.part{background:#5A4413;color:#F2D9A6}
+.rst.done{color:#8FD9A8}
+.rst.todo{color:#E8C07A}
 .item .ihead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .item .ihead b{font-size:12px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase}
 .item .ihead .del{margin-left:auto;background:transparent;border:none;color:var(--red);font-size:13px;font-weight:700;cursor:pointer;padding:4px 6px}
@@ -164,7 +165,7 @@ body.preview main,body.preview nav,body.preview header{display:none}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v10</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v11</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPreview">Предпросмотр</button>
@@ -474,11 +475,11 @@ function paintRow(el){
   const rule = ROW_RULES[list] || ROW_RULES._cost;
   const st = rule(r);
   el.classList.toggle("done", st.full);
-  el.classList.toggle("part", !st.full && any);
+  el.classList.toggle("todo", !st.full);
   const b = el.querySelector(".rst");
   if(b){
-    b.className = "rst" + (st.full ? " done" : (any ? " part" : ""));
-    b.textContent = st.full ? "готово" : (any ? st.label : "");
+    b.className = "rst" + (st.full ? " done" : " todo");
+    b.textContent = st.full ? "готово" : (any ? st.label : "пусто");
   }
 }
 function paintRows(){ document.querySelectorAll(".item[data-row]").forEach(paintRow); }
