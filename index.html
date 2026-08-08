@@ -77,6 +77,11 @@ textarea{min-height:90px;line-height:1.35}
 }
 .mini:active{background:var(--panel2)}
 .item{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;margin:8px 0}
+.item[data-row].part{border-color:#6B4E1C;background:#241c10}
+.item[data-row].done{border-color:#2F6B3A;background:#12201a}
+.rst{font-size:10px;font-weight:800;letter-spacing:.06em;padding:2px 8px;border-radius:999px;text-transform:uppercase}
+.rst.done{background:#1E5B2B;color:#CFEFD6}
+.rst.part{background:#5A4413;color:#F2D9A6}
 .item .ihead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .item .ihead b{font-size:12px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase}
 .item .ihead .del{margin-left:auto;background:transparent;border:none;color:var(--red);font-size:13px;font-weight:700;cursor:pointer;padding:4px 6px}
@@ -159,7 +164,7 @@ body.preview main,body.preview nav,body.preview header{display:none}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v9</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v10</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPreview">Предпросмотр</button>
@@ -454,10 +459,34 @@ function initSigs(){
   });
 }
 
+/* ============ подсветка заполненных строк ============ */
+const ROW_RULES = {
+  trasa:  r => { const zag = r.zk&&r.zm&&r.zd, wyl = r.wk&&r.wm&&r.wd; return {full: !!(zag&&wyl), label: zag&&wyl ? "готово" : (zag?"нет выгрузки":(wyl?"нет загрузки":"неполно"))}; },
+  tankON: r => ({full: !!(r.d&&r.kraj&&r.litry), label:"готово"}),
+  tankAd: r => ({full: !!(r.d&&r.kraj&&r.litry), label:"готово"}),
+  tankChl:r => ({full: !!(r.d&&r.litry), label:"готово"}),
+  _cost:  r => ({full: !!(r.co&&r.d&&r.kwota), label:"готово"})
+};
+function paintRow(el){
+  const [list,i] = (el.dataset.row||"").split("|");
+  const r = (C[list]||[])[+i]; if(!r) return;
+  const any = Object.values(r).some(v => v!=="" && v!==false && v!=null);
+  const rule = ROW_RULES[list] || ROW_RULES._cost;
+  const st = rule(r);
+  el.classList.toggle("done", st.full);
+  el.classList.toggle("part", !st.full && any);
+  const b = el.querySelector(".rst");
+  if(b){
+    b.className = "rst" + (st.full ? " done" : (any ? " part" : ""));
+    b.textContent = st.full ? "готово" : (any ? st.label : "");
+  }
+}
+function paintRows(){ document.querySelectorAll(".item[data-row]").forEach(paintRow); }
+
 function renderTrasa(){
   const rows = C.trasa.map((r,i)=>`
-  <div class="item">
-    <div class="ihead"><b>Строка ${i+1}</b><button class="del" data-del="trasa|${i}">Удалить</button></div>
+  <div class="item" data-row="trasa|${i}">
+    <div class="ihead"><b>Строка ${i+1}</b><span class="rst"></span><button class="del" data-del="trasa|${i}">Удалить</button></div>
     <div class="grid">
       ${inp("trasa."+i+".nr","Nr zlecenia")}
       ${num("trasa."+i+".waga","Waga ładunku","т / кг")}
@@ -487,7 +516,7 @@ function renderTank(){
   const on = C.tankON.map((r,i)=>tankItem("tankON",i,r)).join("");
   const ad = C.tankAd.map((r,i)=>tankItem("tankAd",i,r)).join("");
   const ch = C.tankChl.map((r,i)=>`
-  <div class="item"><div class="ihead"><b>${i+1}</b><button class="del" data-del="tankChl|${i}">Удалить</button></div>
+  <div class="item" data-row="tankChl|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="tankChl|${i}">Удалить</button></div>
     <div class="grid">
       ${dateF("tankChl."+i+".d","Data tankowania")}
       ${inp("tankChl."+i+".karta","Rodzaj karty")}
@@ -507,7 +536,7 @@ function renderTank(){
     <p class="hint">Заправку холодильника берём отдельным чеком, в Trimble вписываем как «paliwo», на чеке подписываем «chłodnia». Не суммируем — каждый бак отдельной строкой.</p></div>`;
 }
 function tankItem(list,i,r){
-  return `<div class="item"><div class="ihead"><b>${i+1}</b><button class="del" data-del="${list}|${i}">Удалить</button></div>
+  return `<div class="item" data-row="${list}|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="${list}|${i}">Удалить</button></div>
   <div class="grid">
     ${dateF(list+"."+i+".d","Data tankowania")}
     ${gpsF(list+"."+i+".kraj","","Kraj")}
@@ -520,15 +549,15 @@ function tankItem(list,i,r){
 }
 
 function renderKoszty(){
-  const z = C.zakupy.map((r,i)=>`<div class="item"><div class="ihead"><b>${i+1}</b><button class="del" data-del="zakupy|${i}">Удалить</button></div>
+  const z = C.zakupy.map((r,i)=>`<div class="item" data-row="zakupy|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="zakupy|${i}">Удалить</button></div>
     <div class="grid"><div class="full">${inp("zakupy."+i+".co","Za co — за что")}</div>
     ${dateF("zakupy."+i+".d","Data")}${inp("zakupy."+i+".bank","Bank / karta")}
     ${num("zakupy."+i+".kwota","Kwota")}${gpsF("zakupy."+i+".kraj","","Kraj")}</div></div>`).join("");
-  const mk = (list,label)=> C[list].map((r,i)=>`<div class="item"><div class="ihead"><b>${i+1}</b><button class="del" data-del="${list}|${i}">Удалить</button></div>
+  const mk = (list,label)=> C[list].map((r,i)=>`<div class="item" data-row="${list}|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="${list}|${i}">Удалить</button></div>
     <div class="grid"><div class="full">${inp(list+"."+i+".co","Za co")}</div>
     ${dateF(list+"."+i+".d","Data")}${inp(list+"."+i+".karta","Rodzaj karty")}
     ${num(list+"."+i+".kwota","Kwota")}${gpsF(list+"."+i+".kraj","","Kraj")}</div></div>`).join("");
-  const w = C.wlasne.map((r,i)=>`<div class="item"><div class="ihead"><b>${i+1}</b><button class="del" data-del="wlasne|${i}">Удалить</button></div>
+  const w = C.wlasne.map((r,i)=>`<div class="item" data-row="wlasne|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="wlasne|${i}">Удалить</button></div>
     <div class="grid"><div class="full">${inp("wlasne."+i+".co","Za co")}</div>
     ${dateF("wlasne."+i+".d","Data")}${num("wlasne."+i+".kwota","Kwota")}
     ${gpsF("wlasne."+i+".kraj","","Kraj")}${inp("wlasne."+i+".kier","Kierowca")}</div></div>`).join("");
@@ -579,7 +608,7 @@ function renderInfo(){
     Чтобы открывалось в один тап: откройте файл в Safari → «Поделиться» → «На экран "Домой"».</p></div>`;
 }
 
-function renderAll(){ renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderInfo(); renderCards(); fillBackupInfo(); }
+function renderAll(){ renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderInfo(); renderCards(); fillBackupInfo(); paintRows(); }
 
 async function fillBackupInfo(){
   const st = $("#bkState"); const list = $("#snapList");
@@ -874,11 +903,13 @@ document.addEventListener("input", e=>{
   if(el.dataset.bool) v = v==="1";
   if(el.dataset.p === "printInstr") v = el.value==="1";
   setP(C, el.dataset.p, v); save();
+  const row = el.closest(".item[data-row]"); if(row) paintRow(row);
 });
 document.addEventListener("change", e=>{
   const el = e.target.closest("[data-p]"); if(!el) return;
   let v = el.value; if(el.dataset.p==="printInstr") v = el.value==="1";
   setP(C, el.dataset.p, v); save();
+  const row = el.closest(".item[data-row]"); if(row) paintRow(row);
 });
 
 document.addEventListener("click", async e=>{
@@ -930,6 +961,7 @@ document.addEventListener("click", async e=>{
                list==="wlasne"?blank.wlasne : blank.oplaty;
     C[list].push(mk()); save();
     if(list==="trasa") renderTrasa(); else if(list.startsWith("tank")) renderTank(); else renderKoszty();
+    paintRows();
     return;
   }
 
@@ -938,6 +970,7 @@ document.addEventListener("click", async e=>{
     if(!confirm("Удалить запись?")) return;
     C[list].splice(+i,1); save();
     if(list==="trasa") renderTrasa(); else if(list.startsWith("tank")) renderTank(); else renderKoszty();
+    paintRows();
     return;
   }
 
