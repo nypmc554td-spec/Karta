@@ -182,7 +182,7 @@ body.preview main,body.preview nav,body.preview header{display:none}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v15</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v16</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPreview">Предпросмотр</button>
@@ -236,7 +236,7 @@ const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 
 /* ============ Карты оплаты: топливные и банковские ============ */
 const CARDS_PRESET = {
-  fuel: ["E100","IDS (Shell / BP / Aral)","Tankpool24","TFC","EW","DKV","UTA","Orlen Flota","Circle K","Moya","Gotówka"],
+  fuel: ["E100","IDS","Shell","BP / Aral","Tankpool24","TFC","EW","DKV","UTA","Orlen Flota","Circle K","Moya","Gotówka"],
   bank: ["BNP Paribas","Erste","PKO BP","Santander","Pekao","ING","mBank","Millennium","Alior","Revolut","Gotówka"]
 };
 function litSum(v){
