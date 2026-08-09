@@ -171,12 +171,18 @@ body.preview main,body.preview nav,body.preview header{display:none}
   @page{size:A4 portrait;margin:12mm}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.sumbadge{display:block;margin-top:4px;color:var(--amber);font-size:12px;min-height:14px}
+.ctrow.tot{border-bottom:none;font-weight:700;padding-top:10px}
+.ctrow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.ctrow span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ctrow small{color:var(--dim);min-width:26px;text-align:right}
+.mycard{display:inline-flex;align-items:center;gap:4px;background:var(--line);border-radius:8px;padding:3px 6px;margin:2px 4px 2px 0;font-size:13px}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v13</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v15</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPreview">Предпросмотр</button>
@@ -227,6 +233,35 @@ const LASTB = "kd_lastb_v1";  // когда последний раз выгру
 /* ================= Модель ================= */
 const LIMITS = {trasa:30, tankON:17, tankAd:9, tankChl:3, zakupy:10, oplaty:10, serwisy:5, mandaty:3, wlasne:3};
 const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+/* ============ Карты оплаты: топливные и банковские ============ */
+const CARDS_PRESET = {
+  fuel: ["E100","IDS (Shell / BP / Aral)","Tankpool24","TFC","EW","DKV","UTA","Orlen Flota","Circle K","Moya","Gotówka"],
+  bank: ["BNP Paribas","Erste","PKO BP","Santander","Pekao","ING","mBank","Millennium","Alior","Revolut","Gotówka"]
+};
+function litSum(v){
+  const parts = String(v==null?"":v).split("+").map(x=>x.trim()).filter(x=>x!=="");
+  const nums = parts.map(x=>parseFloat(x.replace(",","."))).filter(n=>!isNaN(n));
+  const total = nums.reduce((a,b)=>a+b,0);
+  return {n:nums.length, total: Math.round(total*1000)/1000, multi: parts.length>1};
+}
+function litTxt(v){ const t = litSum(v); return t.multi ? `${String(v).replace(/\s*\+\s*/g," + ")} = ${t.total}` : String(v==null?"":v).replace(/\+\s*$/,"").trim(); }
+function litBadge(v){ const t = litSum(v); return t.multi ? `= ${t.total} · чеков: ${t.n}` : ""; }
+function myCards(kind){ return (DB.mycards && DB.mycards[kind]) || []; }
+function cardList(kind){
+  const base = kind==="all" ? CARDS_PRESET.fuel.concat(CARDS_PRESET.bank)
+                            : (CARDS_PRESET[kind]||[]);
+  const mine = kind==="all" ? myCards("fuel").concat(myCards("bank")) : myCards(kind);
+  const out = [];
+  mine.concat(base).forEach(n=>{ if(n && out.indexOf(n)<0) out.push(n); });
+  return out;
+}
+function addMyCard(kind, name){
+  const k = kind==="all" ? "fuel" : kind;
+  DB.mycards = DB.mycards || {fuel:[], bank:[]};
+  DB.mycards[k] = DB.mycards[k] || [];
+  if(DB.mycards[k].indexOf(name)<0) DB.mycards[k].push(name);
+}
 
 function newCard(name){
   return {
@@ -366,6 +401,22 @@ function yn(path,label){ const v=getP(C,path);
    <option value=""${v===""?" selected":""}>—</option>
    <option value="tak"${v==="tak"?" selected":""}>tak</option>
    <option value="nie"${v==="nie"?" selected":""}>nie</option></select></label>`; }
+function numSum(path,label){
+  const v = getP(C,path)||"";
+  return `<label class="f"><span>${esc(label)}</span>
+    <div class="row2"><input data-p="${path}" data-sum="1" value="${esc(v)}" inputmode="decimal" placeholder="300+250">
+    <button class="mini" data-plus="${path}">+ чек</button></div>
+    <small class="sumbadge">${esc(litBadge(v))}</small></label>`;
+}
+function cardF(path,label,kind){
+  const v = getP(C,path)||"";
+  const list = cardList(kind);
+  let o = `<option value=""${v?"":" selected"}>—</option>`;
+  if(v && list.indexOf(v)<0) o += `<option value="${esc(v)}" selected>${esc(v)}</option>`;
+  o += list.map(n=>`<option value="${esc(n)}"${n===v?" selected":""}>${esc(n)}</option>`).join("");
+  o += `<option value="__new">＋ Своя карта…</option>`;
+  return `<label class="f"><span>${esc(label)}</span><select data-p="${path}" data-card="${kind}">${o}</select></label>`;
+}
 
 /* ================= Экраны ================= */
 const TABS = [["main","Карта"],["trasa","Trasa"],["tank","Заправки"],["koszty","Расходы"],["info","Инструкция"]];
@@ -485,8 +536,8 @@ function rowSummary(list, r){
   if(list==="trasa"){
     return `<b>${esc(r.nr)||"—"}</b>${S}Z: ${g(r.zk,r.zm,r.zd,r.zg)}${S}W: ${g(r.wk,r.wm,r.wd,r.wg)}` + (r.waga?`${S}${esc(r.waga)}`:"");
   }
-  if(list==="tankChl") return `${g(r.d,r.kraj)}${S}chłodnia ${esc(r.rej)||""}${S}<b>${esc(r.litry)} L</b>`;
-  if(list==="tankON"||list==="tankAd") return `${g(r.d,r.kraj)}${S}${esc(r.karta)||"—"}${S}<b>${esc(r.litry)} L</b>` + (r.licznik?`${S}${esc(r.licznik)} km`:"");
+  if(list==="tankChl") return `${g(r.d,r.kraj)}${S}chłodnia ${esc(r.rej)||""}${S}<b>${esc(litTxt(r.litry))} L</b>`;
+  if(list==="tankON"||list==="tankAd") return `${g(r.d,r.kraj)}${S}${esc(r.karta)||"—"}${S}<b>${esc(litTxt(r.litry))} L</b>` + (r.licznik?`${S}${esc(r.licznik)} km`:"");
   return `${g(r.d,r.kraj)}${S}${esc(r.co)||"—"}${S}<b>${esc(r.kwota)}</b>`;
 }
 
@@ -544,12 +595,12 @@ function renderTank(){
   <div class="item" data-row="tankChl|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="tankChl|${i}">Удалить</button></div><div class="rsum"></div>
     <div class="grid">
       ${dateF("tankChl."+i+".d","Data tankowania")}
-      ${inp("tankChl."+i+".karta","Rodzaj karty")}
+      ${cardF("tankChl."+i+".karta","Rodzaj karty","fuel")}
       ${gpsF("tankChl."+i+".kraj","","Kraj")}
       ${inp("tankChl."+i+".rej","Numer rej. chłodni")}
       ${num("tankChl."+i+".mgP","Motogodziny — Początek")}
       ${num("tankChl."+i+".mgK","Motogodziny — Koniec")}
-      <div class="full">${num("tankChl."+i+".litry","Zatankowane litry")}</div>
+      <div class="full">${numSum("tankChl."+i+".litry","Zatankowane litry")}</div>
     </div></div>`).join("");
   $("#pane-tank").innerHTML = `
   <div class="card"><h3>Tankowania ciągnika ON <span class="count">${C.tankON.length} / ${LIMITS.tankON}</span></h3>
@@ -558,29 +609,65 @@ function renderTank(){
     ${ad||'<p class="hint">Пусто.</p>'}<button class="add" data-add="tankAd">+ Заправка AdBlue</button></div>
   <div class="card"><h3>Tankowania chłodni <span class="count">${C.tankChl.length} / ${LIMITS.tankChl}</span></h3>
     ${ch||'<p class="hint">Пусто.</p>'}<button class="add" data-add="tankChl">+ Заправка холодильника</button>
-    <p class="hint">Заправку холодильника берём отдельным чеком, в Trimble вписываем как «paliwo», на чеке подписываем «chłodnia». Не суммируем — каждый бак отдельной строкой.</p></div>`;
+    <p class="hint">Заправку холодильника берём отдельным чеком, в Trimble вписываем как «paliwo», на чеке подписываем «chłodnia». Не суммируем — каждый бак отдельной строкой.</p></div>
+  ${cardTotals(
+      C.tankON.map(r=>[r.karta,r.litry])
+        .concat(C.tankAd.map(r=>[r.karta,r.litry]))
+        .concat(C.tankChl.map(r=>[r.karta,r.litry])),
+      "L", "ON, AdBlue и холодильник вместе; справа — сколько чеков.")}`;
 }
 function tankItem(list,i,r){
   return `<div class="item" data-row="${list}|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="${list}|${i}">Удалить</button></div><div class="rsum"></div>
   <div class="grid">
     ${dateF(list+"."+i+".d","Data tankowania")}
     ${gpsF(list+"."+i+".kraj","","Kraj")}
-    ${inp(list+"."+i+".karta","Rodzaj karty")}
-    ${num(list+"."+i+".litry","Zatankowane litry")}
+    ${cardF(list+"."+i+".karta","Rodzaj karty","fuel")}
+    ${numSum(list+"."+i+".litry","Zatankowane litry")}
     ${yn(list+"."+i+".pelna","Czy do pełna?")}
     ${num(list+"."+i+".licznik","Stan licznika")}
     <div class="full">${yn(list+"."+i+".paragon","Czy jest paragon?")}</div>
   </div></div>`;
 }
 
+function sumByCard(rows){
+  const m = {};
+  rows.forEach(([name,val])=>{
+    if(!String(name||"").trim() && !String(val||"").trim()) return;
+    const k = (name||"").trim() || "без карты";
+    const t = litSum(val);
+    if(!m[k]) m[k] = {n:0, sum:0};
+    m[k].n += Math.max(1, t.n); m[k].sum += t.total;
+  });
+  return Object.keys(m).sort().map(k=>[k, m[k]]);
+}
+function cardTotals(rows, unit, hint){
+  const t = sumByCard(rows);
+  if(!t.length) return "";
+  const li = t.map(([k,v])=>`<div class="ctrow"><span>${esc(k)}</span><b>${(Math.round(v.sum*100)/100)} ${unit}</b><small>${v.n}</small></div>`).join("");
+  const all = t.reduce((a,[,v])=>({sum:a.sum+v.sum, n:a.n+v.n}), {sum:0,n:0});
+  const tot = t.length>1 ? `<div class="ctrow tot"><span>Всего</span><b>${(Math.round(all.sum*100)/100)} ${unit}</b><small>${all.n}</small></div>` : "";
+  return `<div class="card"><h3>Итого по картам</h3>${li}${tot}<p class="hint">${esc(hint)}</p></div>`;
+}
+function renderMyCards(){
+  const row = (kind,label)=>{
+    const l = myCards(kind);
+    const items = l.length ? l.map((n,i)=>`<span class="mycard">${esc(n)} <button class="mini" data-mycard-del="${kind}|${i}">✕</button></span>`).join("") : '<span class="hint">пока нет</span>';
+    return `<p><b>${label}:</b> ${items} <button class="mini" data-mycard-add="${kind}">+ добавить</button></p>`;
+  };
+  return `<div class="card"><h3>Мои карты</h3>
+    ${row("fuel","Топливные")}
+    ${row("bank","Банковские")}
+    <p class="hint">Пиши только название и, если нужно, 4 последние цифры — полный номер и PIN в приложение вносить не надо.</p></div>`;
+}
+
 function renderKoszty(){
   const z = C.zakupy.map((r,i)=>`<div class="item" data-row="zakupy|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="zakupy|${i}">Удалить</button></div><div class="rsum"></div>
     <div class="grid"><div class="full">${inp("zakupy."+i+".co","Za co — за что")}</div>
-    ${dateF("zakupy."+i+".d","Data")}${inp("zakupy."+i+".bank","Bank / karta")}
+    ${dateF("zakupy."+i+".d","Data")}${cardF("zakupy."+i+".bank","Bank / karta","bank")}
     ${num("zakupy."+i+".kwota","Kwota")}${gpsF("zakupy."+i+".kraj","","Kraj")}</div></div>`).join("");
   const mk = (list,label)=> C[list].map((r,i)=>`<div class="item" data-row="${list}|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="${list}|${i}">Удалить</button></div><div class="rsum"></div>
     <div class="grid"><div class="full">${inp(list+"."+i+".co","Za co")}</div>
-    ${dateF(list+"."+i+".d","Data")}${inp(list+"."+i+".karta","Rodzaj karty")}
+    ${dateF(list+"."+i+".d","Data")}${cardF(list+"."+i+".karta","Rodzaj karty","all")}
     ${num(list+"."+i+".kwota","Kwota")}${gpsF(list+"."+i+".kraj","","Kraj")}</div></div>`).join("");
   const w = C.wlasne.map((r,i)=>`<div class="item" data-row="wlasne|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="wlasne|${i}">Удалить</button></div><div class="rsum"></div>
     <div class="grid"><div class="full">${inp("wlasne."+i+".co","Za co")}</div>
@@ -598,7 +685,14 @@ function renderKoszty(){
   <div class="card"><h3>Mandaty <span class="count">${C.mandaty.length} / ${LIMITS.mandaty}</span></h3>
     ${mk("mandaty")||'<p class="hint">Пусто.</p>'}<button class="add" data-add="mandaty">+ Штраф</button></div>
   <div class="card"><h3>Zakupy własną kartą lub gotówką <span class="count">${C.wlasne.length} / ${LIMITS.wlasne}</span></h3>
-    ${w||'<p class="hint">Пусто.</p>'}<button class="add" data-add="wlasne">+ Своя покупка</button></div>`;
+    ${w||'<p class="hint">Пусто.</p>'}<button class="add" data-add="wlasne">+ Своя покупка</button></div>
+  ${cardTotals(
+      C.zakupy.map(r=>[r.bank,r.kwota])
+        .concat(C.oplaty.map(r=>[r.karta,r.kwota]))
+        .concat(C.serwisy.map(r=>[r.karta,r.kwota]))
+        .concat(C.mandaty.map(r=>[r.karta,r.kwota])),
+      "", "Суммы складываются как есть — валюты в бланке нет, так что если платил в разных валютах, смотри на строки, а не на общий итог.")}
+  ${renderMyCards()}`;
 }
 
 const INSTR = [
@@ -745,7 +839,7 @@ function printPage1(){
 
 function printPage2(){
   const tr = r=>`<td class="val c">${esc(fmtD(r.d,true))}</td><td class="val c">${esc(r.kraj)}</td><td class="val c">${esc(r.karta)}</td>
-    <td class="val c">${esc(r.litry)}</td><td class="val c">${esc(r.pelna)}</td><td class="val c">${esc(r.licznik)}</td><td class="val c">${esc(r.paragon)}</td>`;
+    <td class="val c">${esc(litTxt(r.litry))}</td><td class="val c">${esc(r.pelna)}</td><td class="val c">${esc(r.licznik)}</td><td class="val c">${esc(r.paragon)}</td>`;
   const head = `<tr><th style="width:6%">Lp.</th><th style="width:15%">Data tankowania</th><th style="width:9%">Kraj</th>
     <th style="width:14%">Rodzaj karty</th><th style="width:17%">Zatankowane litry</th><th style="width:13%">Czy do pełna ?<br>(tak / nie)</th>
     <th style="width:12%">Stan licznika</th><th style="width:14%">Czy jest paragon ?<br>(tak / nie)</th></tr>`;
@@ -754,7 +848,7 @@ function printPage2(){
   const ch = pad(C.tankChl,LIMITS.tankChl,blank.tankChl).map((r,i)=>`<tr><td class="c">${i+1}.</td>
     <td class="val c">${esc(fmtD(r.d,true))}</td><td class="val c">${esc(r.kraj)}</td><td class="val c">${esc(r.karta)}</td>
     <td class="val c">${esc(r.rej)}</td><td class="val c">${esc(r.mgP)}</td><td class="val c">${esc(r.mgK)}</td>
-    <td class="val c">${esc(r.litry)}</td></tr>`).join("");
+    <td class="val c">${esc(litTxt(r.litry))}</td></tr>`).join("");
   return `<div class="sheet">
     <div class="h1">KARTA TANKOWAŃ</div>
     <div class="h2">TANKOWANIA CIĄGNIKA ON :</div>
@@ -924,6 +1018,11 @@ async function maybeAutoBackup(){
 /* ================= События ================= */
 document.addEventListener("input", e=>{
   const el = e.target.closest("[data-p]"); if(!el) return;
+  if(el.dataset.card && el.value === "__new") return;
+  if(el.dataset.sum){
+    const b = el.closest("label") && el.closest("label").querySelector(".sumbadge");
+    if(b) b.textContent = litBadge(el.value);
+  }
   let v = el.value;
   if(el.dataset.bool) v = v==="1";
   if(el.dataset.p === "printInstr") v = el.value==="1";
@@ -932,6 +1031,15 @@ document.addEventListener("input", e=>{
 });
 document.addEventListener("change", e=>{
   const el = e.target.closest("[data-p]"); if(!el) return;
+  if(el.dataset.card && el.value === "__new"){
+    const name = (prompt("Название карты (можно с 4 последними цифрами):")||"").trim();
+    if(!name){ el.value = getP(C, el.dataset.p)||""; return; }
+    addMyCard(el.dataset.card, name);
+    setP(C, el.dataset.p, name); save(true);
+    if(activeTab==="tank") renderTank(); else renderKoszty();
+    paintRows(); toast("Карта добавлена");
+    return;
+  }
   let v = el.value; if(el.dataset.p==="printInstr") v = el.value==="1";
   setP(C, el.dataset.p, v); save();
   const row = el.closest(".item[data-row]"); if(row) paintRow(row);
@@ -973,6 +1081,32 @@ document.addEventListener("click", async e=>{
       toast("Нет доступа к геолокации");
     }
     t.textContent=old; t.disabled=false; return;
+  }
+
+  if(t.dataset.plus){
+    const path = t.dataset.plus;
+    const cur = String(getP(C,path)||"").trim();
+    if(!cur){ toast("Сначала впиши литры первого чека"); return; }
+    if(cur.endsWith("+")) return;
+    setP(C, path, cur + "+"); save();
+    const box = t.closest(".row2");
+    const inpEl = box.querySelector("input[data-p]");
+    inpEl.value = getP(C,path); inpEl.focus();
+    const b = t.closest("label").querySelector(".sumbadge"); if(b) b.textContent = litBadge(inpEl.value);
+    return;
+  }
+
+  if(t.dataset.mycardAdd){
+    const kind = t.dataset.mycardAdd;
+    const name = (prompt("Название карты (можно с 4 последними цифрами):")||"").trim();
+    if(!name) return;
+    addMyCard(kind, name); save(true); renderKoszty(); paintRows(); toast("Добавлено"); return;
+  }
+  if(t.dataset.mycardDel){
+    const [kind,i] = t.dataset.mycardDel.split("|");
+    const l = myCards(kind); const nm = l[+i];
+    if(!confirm(`Убрать «${nm}» из списка? В уже заполненных строках она останется.`)) return;
+    DB.mycards[kind].splice(+i,1); save(true); renderKoszty(); paintRows(); return;
   }
 
   if(t.id === "warnBk" || t.id === "btnShare2"){ shareBackup(); return; }
@@ -1032,6 +1166,7 @@ $("#fileIn").addEventListener("change", e=>{
   const r = new FileReader();
   r.onload = ()=>{ try{
       const data = JSON.parse(r.result);
+      if(data.mycards){ ["fuel","bank"].forEach(k=> (data.mycards[k]||[]).forEach(n=> addMyCard(k,n))); }
       const list = Array.isArray(data.cards) ? data.cards : [data];
       let added = 0;
       list.forEach(c=>{
@@ -1067,6 +1202,9 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
 (async function init(){
   const raw = await Store.get(KEY);
   if(raw){ try{ DB = JSON.parse(raw); }catch(e){ DB={cards:[],active:""}; } }
+  if(!DB.mycards) DB.mycards = {fuel:[], bank:[]};
+  if(!DB.mycards.fuel) DB.mycards.fuel = [];
+  if(!DB.mycards.bank) DB.mycards.bank = [];
   if(!DB.cards || !DB.cards.length){ const c=newCard(); DB={cards:[c], active:c.id}; }
   C = DB.cards.find(c=>c.id===DB.active) || DB.cards[0];
   DB.active = C.id;
