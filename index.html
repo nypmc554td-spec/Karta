@@ -67,6 +67,9 @@ input,textarea,select{
   color:var(--ink);font:16px/1.2 inherit;padding:11px 10px;appearance:none;-webkit-appearance:none;
 }
 input:focus,textarea:focus,select:focus{outline:2px solid var(--amber);outline-offset:1px;border-color:var(--amber)}
+body.hl input.empty,body.hl textarea.empty,body.hl select.empty{background:#FFF6DE;border-color:#E3C489}
+body.hl input.empty:focus,body.hl textarea.empty:focus,body.hl select.empty:focus{background:#FFFFFF}
+@media print{ input.empty,textarea.empty,select.empty{background:#fff !important;border-color:#C7CBD1 !important} }
 input[type=date],input[type=time]{min-height:44px}
 textarea{min-height:90px;line-height:1.35}
 .row2{display:flex;gap:6px}
@@ -182,13 +185,14 @@ body.preview main,body.preview nav,body.preview header{display:none}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v16</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v17</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPreview">Предпросмотр</button>
     <select id="cardSel" style="width:auto;min-width:150px;padding:9px 30px 9px 10px;font-size:14px"></select>
     <button class="btn" id="btnNew">Новая карта</button>
     <button class="btn ghost" id="btnRename">Переименовать</button>
+    <button class="btn ghost" id="btnEmpty">Пустые</button>
     <button class="btn" id="btnShare">Копия ⤴</button>
     <button class="btn ghost" id="btnExport">Экспорт</button>
     <button class="btn ghost" id="btnImport">Импорт</button>
@@ -557,7 +561,7 @@ function paintRow(el){
   const sm = el.querySelector(".rsum");
   if(sm && st.full) sm.innerHTML = rowSummary(list, r);
 }
-function paintRows(){ document.querySelectorAll(".item[data-row]").forEach(paintRow); }
+function paintRows(){ document.querySelectorAll(".item[data-row]").forEach(paintRow); paintEmpty(); }
 
 function renderTrasa(){
   const rows = C.trasa.map((r,i)=>`
@@ -727,7 +731,18 @@ function renderInfo(){
     Чтобы открывалось в один тап: откройте файл в Safari → «Поделиться» → «На экран "Домой"».</p></div>`;
 }
 
-function renderAll(){ renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderInfo(); renderCards(); fillBackupInfo(); paintRows(); }
+function markEmpty(el){ el.classList.toggle("empty", String(el.value||"").trim()===""); }
+function paintEmpty(){
+  if(!document.body.classList.contains("hl")) return;
+  document.querySelectorAll("main input[data-p], main select[data-p], main textarea[data-p]").forEach(markEmpty);
+}
+function applyHl(){
+  document.body.classList.toggle("hl", DB.hlEmpty !== false);
+  const b = $("#btnEmpty"); if(b) b.textContent = (DB.hlEmpty !== false) ? "Пустые ✓" : "Пустые";
+  if(DB.hlEmpty === false) document.querySelectorAll(".empty").forEach(e=>e.classList.remove("empty"));
+  else paintEmpty();
+}
+function renderAll(){ renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderInfo(); renderCards(); fillBackupInfo(); paintRows(); applyHl(); }
 
 async function fillBackupInfo(){
   const st = $("#bkState"); const list = $("#snapList");
@@ -1019,6 +1034,7 @@ async function maybeAutoBackup(){
 document.addEventListener("input", e=>{
   const el = e.target.closest("[data-p]"); if(!el) return;
   if(el.dataset.card && el.value === "__new") return;
+  if(el.dataset.p) markEmpty(el);
   if(el.dataset.sum){
     const b = el.closest("label") && el.closest("label").querySelector(".sumbadge");
     if(b) b.textContent = litBadge(el.value);
@@ -1040,6 +1056,7 @@ document.addEventListener("change", e=>{
     paintRows(); toast("Карта добавлена");
     return;
   }
+  markEmpty(el);
   let v = el.value; if(el.dataset.p==="printInstr") v = el.value==="1";
   setP(C, el.dataset.p, v); save();
   const row = el.closest(".item[data-row]"); if(row) paintRow(row);
@@ -1063,7 +1080,7 @@ document.addEventListener("click", async e=>{
     if(kind==="dt"){ setP(C,p1,todayISO()); setP(C,p2,nowHM()); }
     const box = t.closest("label") || t.closest(".row2");
     box.querySelectorAll("input").forEach(i=>{ const p=i.dataset.p; if(p) i.value = getP(C,p)||""; });
-    save(); toast("Дата и время подставлены"); return;
+    save(); paintEmpty(); toast("Дата и время подставлены"); return;
   }
 
   if(t.dataset.gps){
@@ -1075,7 +1092,7 @@ document.addEventListener("click", async e=>{
       if(pm && r.city) setP(C,pm,r.city);
       const box = t.closest("label")||t.closest(".row2");
       box.querySelectorAll("input").forEach(i=>{ const p=i.dataset.p; if(p) i.value = getP(C,p)||""; });
-      save();
+      save(); paintEmpty();
       toast(r.city ? `${r.kraj}, ${r.city}` : (r.kraj? `Страна: ${r.kraj}` : "Страна не определена"));
     }catch(err){
       toast("Нет доступа к геолокации");
@@ -1150,6 +1167,8 @@ document.addEventListener("click", async e=>{
     case "btnDel": { if(DB.cards.length<2){ toast("Это единственная карта"); return; }
       if(!confirm(`Удалить «${C.name}»? Данные пропадут.`)) return;
       DB.cards = DB.cards.filter(c=>c.id!==C.id); C = DB.cards[0]; DB.active=C.id; save(true); renderAll(); break; }
+    case "btnEmpty": DB.hlEmpty = (DB.hlEmpty === false); save(true); applyHl();
+      toast(DB.hlEmpty === false ? "Подсветка выключена" : "Пустые графы подсвечены"); break;
     case "btnExport": saveBackupFile(); break;
     case "btnShare": shareBackup(); break;
     case "btnImport": $("#fileIn").click(); break;
