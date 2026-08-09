@@ -185,7 +185,7 @@ body.preview main,body.preview nav,body.preview header{display:none}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v17</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v18</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPreview">Предпросмотр</button>
@@ -615,10 +615,8 @@ function renderTank(){
     ${ch||'<p class="hint">Пусто.</p>'}<button class="add" data-add="tankChl">+ Заправка холодильника</button>
     <p class="hint">Заправку холодильника берём отдельным чеком, в Trimble вписываем как «paliwo», на чеке подписываем «chłodnia». Не суммируем — каждый бак отдельной строкой.</p></div>
   ${cardTotals(
-      C.tankON.map(r=>[r.karta,r.litry])
-        .concat(C.tankAd.map(r=>[r.karta,r.litry]))
-        .concat(C.tankChl.map(r=>[r.karta,r.litry])),
-      "L", "ON, AdBlue и холодильник вместе; справа — сколько чеков.")}`;
+      C.tankON.map(r=>[r.karta,r.litry]),
+      "L", "Только ON тягача — AdBlue и холодильник сюда не идут. Справа — сколько чеков.")}`;
 }
 function tankItem(list,i,r){
   return `<div class="item" data-row="${list}|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="${list}|${i}">Удалить</button></div><div class="rsum"></div>
