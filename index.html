@@ -174,6 +174,7 @@ body.preview main,body.preview nav,body.preview header{display:none}
   @page{size:A4 portrait;margin:12mm}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+select.cur{flex:0 0 108px;padding-left:8px;padding-right:8px;font-size:15px}
 .sumbadge{display:block;margin-top:4px;color:var(--amber);font-size:12px;min-height:14px}
 .ctrow.tot{border-bottom:none;font-weight:700;padding-top:10px}
 .ctrow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
@@ -185,7 +186,7 @@ body.preview main,body.preview nav,body.preview header{display:none}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v18</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v19</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPreview">Предпросмотр</button>
@@ -243,6 +244,16 @@ const CARDS_PRESET = {
   fuel: ["E100","IDS","Shell","BP / Aral","Tankpool24","TFC","EW","DKV","UTA","Orlen Flota","Circle K","Moya","Gotówka"],
   bank: ["BNP Paribas","Erste","PKO BP","Santander","Pekao","ING","mBank","Millennium","Alior","Revolut","Gotówka"]
 };
+/* ============ Валюты ============ */
+const CURR = ["EUR €","PLN zł","CHF","CZK Kč","DKK kr","NOK kr","SEK kr","HUF Ft","GBP £","RON lei"];
+const CURR_BY_KRAJ = {
+  PL:"PLN zł", CZ:"CZK Kč", CH:"CHF", DK:"DKK kr", NO:"NOK kr", SE:"SEK kr", HU:"HUF Ft",
+  GB:"GBP £", UK:"GBP £", RO:"RON lei",
+  DE:"EUR €", FR:"EUR €", IT:"EUR €", ES:"EUR €", NL:"EUR €", BE:"EUR €", AT:"EUR €",
+  SK:"EUR €", SI:"EUR €", LT:"EUR €", LV:"EUR €", EE:"EUR €", FI:"EUR €", PT:"EUR €",
+  IE:"EUR €", GR:"EUR €", HR:"EUR €", LU:"EUR €"
+};
+function curCode(v){ return String(v||"").split(" ")[0]; }
 function litSum(v){
   const parts = String(v==null?"":v).split("+").map(x=>x.trim()).filter(x=>x!=="");
   const nums = parts.map(x=>parseFloat(x.replace(",","."))).filter(n=>!isNaN(n));
@@ -412,6 +423,16 @@ function numSum(path,label){
     <button class="mini" data-plus="${path}">+ чек</button></div>
     <small class="sumbadge">${esc(litBadge(v))}</small></label>`;
 }
+function kwotaF(base,label){
+  const v = getP(C, base+".kwota")||"";
+  const c = getP(C, base+".cur")||"";
+  const o = `<option value=""${c?"":" selected"}>—</option>` +
+    CURR.map(n=>`<option value="${esc(n)}"${n===c?" selected":""}>${esc(n)}</option>`).join("");
+  return `<label class="f"><span>${esc(label)}</span><div class="row2">
+    <input data-p="${base}.kwota" value="${esc(v)}" inputmode="decimal">
+    <select data-p="${base}.cur" class="cur">${o}</select></div></label>`;
+}
+function kwotaTxt(r){ const c = curCode(r.cur); return (r.kwota||"") + (r.kwota && c ? " "+c : ""); }
 function cardF(path,label,kind){
   const v = getP(C,path)||"";
   const list = cardList(kind);
@@ -542,7 +563,7 @@ function rowSummary(list, r){
   }
   if(list==="tankChl") return `${g(r.d,r.kraj)}${S}chłodnia ${esc(r.rej)||""}${S}<b>${esc(litTxt(r.litry))} L</b>`;
   if(list==="tankON"||list==="tankAd") return `${g(r.d,r.kraj)}${S}${esc(r.karta)||"—"}${S}<b>${esc(litTxt(r.litry))} L</b>` + (r.licznik?`${S}${esc(r.licznik)} km`:"");
-  return `${g(r.d,r.kraj)}${S}${esc(r.co)||"—"}${S}<b>${esc(r.kwota)}</b>`;
+  return `${g(r.d,r.kraj)}${S}${esc(r.co)||"—"}${S}<b>${esc(kwotaTxt(r))}</b>`;
 }
 
 function paintRow(el){
@@ -631,6 +652,10 @@ function tankItem(list,i,r){
   </div></div>`;
 }
 
+function ck(card, cur){
+  const c = curCode(cur);
+  return (String(card||"").trim() || "без карты") + (c ? " · " + c : "");
+}
 function sumByCard(rows){
   const m = {};
   rows.forEach(([name,val])=>{
@@ -647,7 +672,7 @@ function cardTotals(rows, unit, hint){
   if(!t.length) return "";
   const li = t.map(([k,v])=>`<div class="ctrow"><span>${esc(k)}</span><b>${(Math.round(v.sum*100)/100)} ${unit}</b><small>${v.n}</small></div>`).join("");
   const all = t.reduce((a,[,v])=>({sum:a.sum+v.sum, n:a.n+v.n}), {sum:0,n:0});
-  const tot = t.length>1 ? `<div class="ctrow tot"><span>Всего</span><b>${(Math.round(all.sum*100)/100)} ${unit}</b><small>${all.n}</small></div>` : "";
+  const tot = (unit && t.length>1) ? `<div class="ctrow tot"><span>Всего</span><b>${(Math.round(all.sum*100)/100)} ${unit}</b><small>${all.n}</small></div>` : "";
   return `<div class="card"><h3>Итого по картам</h3>${li}${tot}<p class="hint">${esc(hint)}</p></div>`;
 }
 function renderMyCards(){
@@ -666,14 +691,14 @@ function renderKoszty(){
   const z = C.zakupy.map((r,i)=>`<div class="item" data-row="zakupy|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="zakupy|${i}">Удалить</button></div><div class="rsum"></div>
     <div class="grid"><div class="full">${inp("zakupy."+i+".co","Za co — за что")}</div>
     ${dateF("zakupy."+i+".d","Data")}${cardF("zakupy."+i+".bank","Bank / karta","bank")}
-    ${num("zakupy."+i+".kwota","Kwota")}${gpsF("zakupy."+i+".kraj","","Kraj")}</div></div>`).join("");
+    ${kwotaF("zakupy."+i,"Kwota")}${gpsF("zakupy."+i+".kraj","","Kraj")}</div></div>`).join("");
   const mk = (list,label)=> C[list].map((r,i)=>`<div class="item" data-row="${list}|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="${list}|${i}">Удалить</button></div><div class="rsum"></div>
     <div class="grid"><div class="full">${inp(list+"."+i+".co","Za co")}</div>
     ${dateF(list+"."+i+".d","Data")}${cardF(list+"."+i+".karta","Rodzaj karty","all")}
-    ${num(list+"."+i+".kwota","Kwota")}${gpsF(list+"."+i+".kraj","","Kraj")}</div></div>`).join("");
+    ${kwotaF(list+"."+i,"Kwota")}${gpsF(list+"."+i+".kraj","","Kraj")}</div></div>`).join("");
   const w = C.wlasne.map((r,i)=>`<div class="item" data-row="wlasne|${i}"><div class="ihead"><b>${i+1}</b><span class="rst"></span><button class="del" data-del="wlasne|${i}">Удалить</button></div><div class="rsum"></div>
     <div class="grid"><div class="full">${inp("wlasne."+i+".co","Za co")}</div>
-    ${dateF("wlasne."+i+".d","Data")}${num("wlasne."+i+".kwota","Kwota")}
+    ${dateF("wlasne."+i+".d","Data")}${kwotaF("wlasne."+i,"Kwota")}
     ${gpsF("wlasne."+i+".kraj","","Kraj")}${inp("wlasne."+i+".kier","Kierowca")}</div></div>`).join("");
 
   $("#pane-koszty").innerHTML = `
@@ -689,11 +714,12 @@ function renderKoszty(){
   <div class="card"><h3>Zakupy własną kartą lub gotówką <span class="count">${C.wlasne.length} / ${LIMITS.wlasne}</span></h3>
     ${w||'<p class="hint">Пусто.</p>'}<button class="add" data-add="wlasne">+ Своя покупка</button></div>
   ${cardTotals(
-      C.zakupy.map(r=>[r.bank,r.kwota])
-        .concat(C.oplaty.map(r=>[r.karta,r.kwota]))
-        .concat(C.serwisy.map(r=>[r.karta,r.kwota]))
-        .concat(C.mandaty.map(r=>[r.karta,r.kwota])),
-      "", "Суммы складываются как есть — валюты в бланке нет, так что если платил в разных валютах, смотри на строки, а не на общий итог.")}
+      C.zakupy.map(r=>[ck(r.bank,r.cur),r.kwota])
+        .concat(C.oplaty.map(r=>[ck(r.karta,r.cur),r.kwota]))
+        .concat(C.serwisy.map(r=>[ck(r.karta,r.cur),r.kwota]))
+        .concat(C.mandaty.map(r=>[ck(r.karta,r.cur),r.kwota]))
+        .concat(C.wlasne.map(r=>[ck("своя карта / наличные",r.cur),r.kwota])),
+      "", "Каждая валюта считается отдельно — ничего не смешивается. Справа — сколько строк.")}
   ${renderMyCards()}`;
 }
 
@@ -881,11 +907,11 @@ function printPage2(){
 function printPage3(){
   const dl = (v,n)=> v? esc(v) : ".".repeat(n);
   const zak = pad(C.zakupy,LIMITS.zakupy,blank.zakupy).map((r,i)=>
-    `<div>${i+1}. Za co: ${dl(r.co,52)} Data: ${dl(fmtD(r.d,true),10)} Bank: ${dl(r.bank,10)} Kwota: ${dl(r.kwota,9)} Kraj: ${dl(r.kraj,5)}</div>`).join("");
+    `<div>${i+1}. Za co: ${dl(r.co,52)} Data: ${dl(fmtD(r.d,true),10)} Bank: ${dl(r.bank,10)} Kwota: ${dl(kwotaTxt(r),11)} Kraj: ${dl(r.kraj,5)}</div>`).join("");
   const lst = (list,n)=> pad(C[list],LIMITS[list],blank.oplaty).map((r,i)=>
-    `<div>${i+1}. Za co: ${dl(r.co,n)} Data: ${dl(fmtD(r.d,true),10)} Rodzaj karty: ${dl(r.karta,16)} Kwota: ${dl(r.kwota,9)} Kraj: ${dl(r.kraj,7)}</div>`).join("");
+    `<div>${i+1}. Za co: ${dl(r.co,n)} Data: ${dl(fmtD(r.d,true),10)} Rodzaj karty: ${dl(r.karta,16)} Kwota: ${dl(kwotaTxt(r),11)} Kraj: ${dl(r.kraj,7)}</div>`).join("");
   const wl = pad(C.wlasne,LIMITS.wlasne,blank.wlasne).map((r,i)=>
-    `<div>${i+1}. Za co: ${dl(r.co,20)} Data: ${dl(fmtD(r.d,true),12)} Kwota ${dl(r.kwota,14)} Kraj: ${dl(r.kraj,14)} Kierowca: ${dl(r.kier,12)}</div>`).join("");
+    `<div>${i+1}. Za co: ${dl(r.co,20)} Data: ${dl(fmtD(r.d,true),12)} Kwota ${dl(kwotaTxt(r),14)} Kraj: ${dl(r.kraj,14)} Kierowca: ${dl(r.kier,12)}</div>`).join("");
   return `<div class="sheet">
     <div class="h1" style="font-size:11pt">DODATKOWE ZAKUPY KARTĄ BANKOWĄ LUB GOTÓWKĄ</div>
     <div class="lines">${zak}</div>
@@ -1087,6 +1113,15 @@ document.addEventListener("click", async e=>{
     try{
       const r = await placeNow();
       if(pk) setP(C,pk,r.kraj);
+      if(pk && pk.endsWith(".kraj")){
+        const cp = pk.slice(0,-5) + ".cur";
+        const guess = CURR_BY_KRAJ[String(r.kraj||"").toUpperCase()];
+        if(guess && !getP(C,cp)){
+          setP(C,cp,guess);
+          const sel = document.querySelector(`select[data-p="${cp}"]`);
+          if(sel){ sel.value = guess; markEmpty(sel); }
+        }
+      }
       if(pm && r.city) setP(C,pm,r.city);
       const box = t.closest("label")||t.closest(".row2");
       box.querySelectorAll("input").forEach(i=>{ const p=i.dataset.p; if(p) i.value = getP(C,p)||""; });
