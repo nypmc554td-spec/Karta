@@ -85,19 +85,16 @@ textarea{min-height:90px;line-height:1.35}
 .item[data-row].done{background:#E4F2E8;border-color:#8CC5A2}
 /* закрытая строка — белая полоска, как на бланке */
 .rsum{display:none}
-.item.done:not(.open),.item.fold:not(.open){padding:8px}
-.item.done:not(.open) .grid,.item.done:not(.open) .sub,
-.item.fold:not(.open) .grid,.item.fold:not(.open) .sub{display:none}
-.item.done:not(.open) .ihead,.item.fold:not(.open) .ihead{margin-bottom:6px}
-.item.done:not(.open) .rsum,.item.fold:not(.open) .rsum{display:block;background:#F4FBF6;color:#15181c;border:1px solid #A9D6BB;border-radius:6px;
+.item.fold{padding:8px}
+.item.fold .grid,.item.fold .sub{display:none}
+.item.fold .ihead{margin-bottom:6px}
+.item.fold .rsum{display:block;background:#F4FBF6;color:#15181c;border:1px solid #A9D6BB;border-radius:6px;
   padding:6px 9px;font-size:12.5px;line-height:1.45;font-family:"Times New Roman",Georgia,serif;cursor:pointer}
 .rsum b{font-weight:700}
 .rsum .sep{color:#7a808a;padding:0 5px}
-.item.done .ihead .rst::after,.item.fold .ihead .rst::after{content:" ▾";font-weight:400}
-.item.done.open .ihead .rst::after,.item.fold.open .ihead .rst::after{content:" ▴"}
 .fbtn{margin-left:auto;background:#E4F2E8;border:1px solid #8CC5A2;color:#1F6B41;
   font-size:12px;font-weight:700;border-radius:999px;padding:5px 12px;cursor:pointer}
-.item.fold:not(.open) .fbtn,.item.done:not(.open) .fbtn{background:#fff;border-color:#C9CDD3;color:#5A6069}
+.item.fold .fbtn{background:#fff;border-color:#C9CDD3;color:#5A6069}
 .item .ihead .fbtn + .del{margin-left:6px}
 .rst{font-size:10px;font-weight:800;letter-spacing:.06em;padding:2px 8px;border-radius:999px;text-transform:uppercase}
 .rst.done{color:#1F6B41}
@@ -158,6 +155,8 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
 .i{font-style:italic}
 .nb td{border:none}
 .val{font-family:"Courier New",monospace;font-size:8.5pt}
+.fitv{display:block;white-space:nowrap;overflow:hidden}
+.fitv.c{text-align:center}
 .h1{text-align:center;font-weight:bold;font-size:12pt;margin:0 0 6px}
 .h2{text-align:center;font-weight:bold;font-style:italic;font-size:10.5pt;margin:8px 0 4px}
 .decl{font-style:italic;font-weight:bold;text-decoration:underline;font-size:10pt;margin:8px 0 2px;text-align:center}
@@ -200,7 +199,7 @@ select.cur{flex:0 0 108px;padding-left:8px;padding-right:8px;font-size:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v24</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v25</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -647,11 +646,13 @@ function paintRow(el){
     b.className = "rst" + (st.full ? " done" : " todo");
     b.textContent = T(st.full ? "готово" : (any ? st.label : "пусто"));
   }
-  el.classList.toggle("fold", r._f === true);
+  const folded = r._f === true;
+  el.classList.toggle("fold", folded);
+  el.classList.remove("open");
   const fb = el.querySelector(".fbtn");
-  if(fb) fb.textContent = T(r._f === true ? "Править" : "Готово");
+  if(fb) fb.textContent = T(folded ? "Править" : "Готово");
   const sm = el.querySelector(".rsum");
-  if(sm && (st.full || r._f === true)){ sm.innerHTML = rowSummary(list, r); translateTree(sm); }
+  if(sm && folded){ sm.innerHTML = rowSummary(list, r); translateTree(sm); }
 }
 function paintRows(){ document.querySelectorAll(".item[data-row]").forEach(paintRow); paintEmpty(); }
 
@@ -871,12 +872,23 @@ function renderCards(){
 function pad(list,n,mk){ const a = list.slice(0,n).map(x=>x); while(a.length<n) a.push(mk()); return a; }
 const D = "……………";
 
+/* Длинное значение (город и т.п.) не переносим, а слегка ужимаем по ширине графы.
+   cap — сколько знаков помещается в графу при обычном 8.5pt. */
+function fitv(v, cap, cls){
+  const t = String(v == null ? "" : v).trim();
+  const c = "val fitv" + (cls ? " " + cls : "");
+  if(!t) return `<span class="${c}"></span>`;
+  if(t.length <= cap) return `<span class="${c}">${esc(t)}</span>`;
+  const pt = Math.max(5.4, Math.round(8.5 * cap / t.length * 10) / 10);
+  return `<span class="${c}" style="font-size:${pt}pt">${esc(t)}</span>`;
+}
+
 function printPage1(){
   const h=C.head,b=C.bus,z=C.baza,s=C.stany;
   const rows = pad(C.trasa, LIMITS.trasa, blank.trasa).map(r=>`<tr>
-    <td class="val c">${esc(r.nr)}</td><td class="val c">${esc(r.zk)}</td><td class="val">${esc(r.zm)}</td>
+    <td class="val c">${esc(r.nr)}</td><td class="val c">${esc(r.zk)}</td><td>${fitv(r.zm,11)}</td>
     <td class="val c">${esc(fmtDT(r.zd,r.zg,true))||"/"}</td><td class="val c">${esc(r.zl)}</td>
-    <td class="val c">${esc(r.wk)}</td><td class="val">${esc(r.wm)}</td>
+    <td class="val c">${esc(r.wk)}</td><td>${fitv(r.wm,11)}</td>
     <td class="val c">${esc(fmtDT(r.wd,r.wg,true))||"/"}</td><td class="val c">${esc(r.wl)}</td>
     <td class="val c">${esc(r.waga)}</td></tr>`).join("");
   return `<div class="sheet">
@@ -943,7 +955,7 @@ function printPage1(){
 }
 
 function printPage2(){
-  const tr = r=>`<td class="val c">${esc(fmtD(r.d,true))}</td><td class="val c">${esc(r.kraj)}</td><td class="val c">${esc(r.karta)}</td>
+  const tr = r=>`<td class="val c">${esc(fmtD(r.d,true))}</td><td class="val c">${esc(r.kraj)}</td><td class="c">${fitv(r.karta,13,"c")}</td>
     <td class="val c">${esc(litTxt(r.litry))}</td><td class="val c">${esc(r.pelna)}</td><td class="val c">${esc(r.licznik)}</td><td class="val c">${esc(r.paragon)}</td>`;
   const head = `<tr><th style="width:6%">Lp.</th><th style="width:15%">Data tankowania</th><th style="width:9%">Kraj</th>
     <th style="width:14%">Rodzaj karty</th><th style="width:17%">Zatankowane litry</th><th style="width:13%">Czy do pełna ?<br>(tak / nie)</th>
@@ -951,8 +963,8 @@ function printPage2(){
   const on = pad(C.tankON,LIMITS.tankON,blank.tank).map((r,i)=>`<tr><td class="c">${i+1}</td>${tr(r)}</tr>`).join("");
   const ad = pad(C.tankAd,LIMITS.tankAd,blank.tank).map((r,i)=>`<tr><td class="c">${i+1}</td>${tr(r)}</tr>`).join("");
   const ch = pad(C.tankChl,LIMITS.tankChl,blank.tankChl).map((r,i)=>`<tr><td class="c">${i+1}.</td>
-    <td class="val c">${esc(fmtD(r.d,true))}</td><td class="val c">${esc(r.kraj)}</td><td class="val c">${esc(r.karta)}</td>
-    <td class="val c">${esc(r.rej)}</td><td class="val c">${esc(r.mgP)}</td><td class="val c">${esc(r.mgK)}</td>
+    <td class="val c">${esc(fmtD(r.d,true))}</td><td class="val c">${esc(r.kraj)}</td><td class="c">${fitv(r.karta,13,"c")}</td>
+    <td class="c">${fitv(r.rej,14,"c")}</td><td class="val c">${esc(r.mgP)}</td><td class="val c">${esc(r.mgK)}</td>
     <td class="val c">${esc(litTxt(r.litry))}</td></tr>`).join("");
   return `<div class="sheet">
     <div class="h1">KARTA TANKOWAŃ</div>
@@ -1152,10 +1164,6 @@ document.addEventListener("change", e=>{
   const row = el.closest(".item[data-row]"); if(row) paintRow(row);
 });
 
-document.addEventListener("click", e=>{
-  const sm = e.target.closest(".rsum"); if(!sm) return;
-  sm.closest(".item").classList.toggle("open");
-});
 document.addEventListener("click", async e=>{
   const t = e.target.closest("button, .tab"); if(!t) return;
 
@@ -1248,10 +1256,8 @@ document.addEventListener("click", async e=>{
     const [list,i] = t.dataset.fold.split("|");
     const r = (C[list]||[])[+i]; if(!r) return;
     const row = t.closest(".item[data-row]");
-    if(r._f === true){ delete r._f; if(row) row.classList.add("open"); }
-    else { r._f = true; if(row) row.classList.remove("open"); }
-    save(true); if(row) paintRow(row);
-    if(r._f === true && row) row.scrollIntoView({block:"nearest"});
+    if(r._f === true) delete r._f; else r._f = true;
+    save(true); if(row){ paintRow(row); row.scrollIntoView({block:"nearest"}); }
     return;
   }
 
