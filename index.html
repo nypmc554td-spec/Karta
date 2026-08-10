@@ -184,7 +184,7 @@ select.cur{flex:0 0 108px;padding-left:8px;padding-right:8px;font-size:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v20</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v21</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="cardSel" style="width:auto;min-width:150px;padding:9px 30px 9px 10px;font-size:14px"></select>
@@ -887,7 +887,7 @@ function printPage2(){
     <td class="val c">${esc(litTxt(r.litry))}</td></tr>`).join("");
   return `<div class="sheet">
     <div class="h1">KARTA TANKOWAŃ</div>
-    <div class="h2">TANKOWANIA CIĄGNIKA ON :</div>
+    <div class="h2">TANKOWANIA CIĄGNIKA ON : <span class="val">${esc(C.head.nrRej)}</span></div>
     <table class="tank">${head}${on}</table>
     <div class="h2">TANKOWANIA ADBLUE</div>
     <table class="tank">${head}${ad}</table>
