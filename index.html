@@ -103,6 +103,17 @@ textarea{min-height:90px;line-height:1.35}
 .sub{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin:14px 0 4px 2px}
 .hint{color:var(--dim);font-size:12px;line-height:1.5;margin:8px 2px}
 .count{color:var(--dim);font-size:12px;margin-left:auto}
+/* --- цветовые шапки секций заправок --- */
+.card.sec > h3{
+  display:flex;align-items:center;gap:8px;
+  margin:-12px -12px 12px;padding:10px 12px;
+  border-radius:calc(var(--r) - 1px) calc(var(--r) - 1px) 0 0;
+  border-bottom:1px solid;
+}
+.card.sec > h3 .count{color:inherit;opacity:.72}
+.sec-on  > h3{background:#E4F0E6;color:#256640;border-bottom-color:#C4DDC9}
+.sec-ad  > h3{background:#E4ECF7;color:#28527F;border-bottom-color:#C6D6EB}
+.sec-chl > h3{background:#F1E9F5;color:#5B3F77;border-bottom-color:#DDCFE6}
 .add{width:100%;margin-top:6px;background:transparent;border:1px dashed var(--line);color:var(--amber);
   border-radius:12px;padding:12px;font-size:14px;font-weight:700;cursor:pointer}
 .bkwarn{margin:10px 12px 0;padding:11px 12px;border-radius:12px;background:#FDF3DC;border:1px solid #E0BE72;
@@ -184,7 +195,7 @@ select.cur{flex:0 0 108px;padding-left:8px;padding-right:8px;font-size:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v21</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v22</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="cardSel" style="width:auto;min-width:150px;padding:9px 30px 9px 10px;font-size:14px"></select>
@@ -625,11 +636,11 @@ function renderTank(){
       <div class="full">${numSum("tankChl."+i+".litry","Zatankowane litry")}</div>
     </div></div>`).join("");
   $("#pane-tank").innerHTML = `
-  <div class="card"><h3>Tankowania ciągnika ON <span class="count">${C.tankON.length} / ${LIMITS.tankON}</span></h3>
+  <div class="card sec sec-on"><h3>Tankowania ciągnika ON <span class="count">${C.tankON.length} / ${LIMITS.tankON}</span></h3>
     ${on||'<p class="hint">Пусто.</p>'}<button class="add" data-add="tankON">+ Заправка ON</button></div>
-  <div class="card"><h3>Tankowania AdBlue <span class="count">${C.tankAd.length} / ${LIMITS.tankAd}</span></h3>
+  <div class="card sec sec-ad"><h3>Tankowania AdBlue <span class="count">${C.tankAd.length} / ${LIMITS.tankAd}</span></h3>
     ${ad||'<p class="hint">Пусто.</p>'}<button class="add" data-add="tankAd">+ Заправка AdBlue</button></div>
-  <div class="card"><h3>Tankowania chłodni <span class="count">${C.tankChl.length} / ${LIMITS.tankChl}</span></h3>
+  <div class="card sec sec-chl"><h3>Tankowania chłodni <span class="count">${C.tankChl.length} / ${LIMITS.tankChl}</span></h3>
     ${ch||'<p class="hint">Пусто.</p>'}<button class="add" data-add="tankChl">+ Заправка холодильника</button>
     <p class="hint">Заправку холодильника берём отдельным чеком, в Trimble вписываем как «paliwo», на чеке подписываем «chłodnia». Не суммируем — каждый бак отдельной строкой.</p></div>
   ${cardTotals(
