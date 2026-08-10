@@ -199,7 +199,7 @@ select.cur{flex:0 0 108px;padding-left:8px;padding-right:8px;font-size:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v25</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v26</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -877,10 +877,24 @@ const D = "……………";
 function fitv(v, cap, cls){
   const t = String(v == null ? "" : v).trim();
   const c = "val fitv" + (cls ? " " + cls : "");
-  if(!t) return `<span class="${c}"></span>`;
-  if(t.length <= cap) return `<span class="${c}">${esc(t)}</span>`;
-  const pt = Math.max(5.4, Math.round(8.5 * cap / t.length * 10) / 10);
-  return `<span class="${c}" style="font-size:${pt}pt">${esc(t)}</span>`;
+  return `<span class="${c}">${esc(t)}</span>`;
+}
+
+/* Замер по факту: если значение не влезло в графу — уменьшаем шрифт, пока не влезет. */
+function fitCells(){
+  document.querySelectorAll("#print .fitv").forEach(el=>{
+    el.style.fontSize = "";
+    const td = el.parentElement; if(!td) return;
+    const avail = td.clientWidth - 4;
+    if(avail <= 0 || !el.textContent.trim()) return;
+    let sz = parseFloat(getComputedStyle(el).fontSize) || 11.3;
+    let w = el.scrollWidth, guard = 0;
+    while(w > avail && sz > 5 && guard++ < 25){
+      sz = Math.max(5, sz * Math.min(0.94, avail / w));
+      el.style.fontSize = sz + "px";
+      w = el.scrollWidth;
+    }
+  });
 }
 
 function printPage1(){
@@ -1028,6 +1042,7 @@ function buildPrint(){
   const pages = [printPage1(), printPage2(), printPage3(), printPage4()];
   $("#print").innerHTML = pages.map(p => `<div class="page">${p}</div>`).join("");
   fitPages();
+  fitCells();
 }
 
 /* Каждый лист ужимается ровно под один A4, чтобы всегда было 4 страницы */
