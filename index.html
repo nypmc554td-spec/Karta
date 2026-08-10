@@ -195,9 +195,14 @@ select.cur{flex:0 0 108px;padding-left:8px;padding-right:8px;font-size:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v22</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v23</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
+    <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
+      <option value="ru">🇧🇾 Русский</option>
+      <option value="ua">🇺🇦 Українська</option>
+      <option value="pl">🇵🇱 Polski</option>
+    </select>
     <select id="cardSel" style="width:auto;min-width:150px;padding:9px 30px 9px 10px;font-size:14px"></select>
     <button class="btn" id="btnNew">Новая карта</button>
     <button class="btn ghost" id="btnRename">Переименовать</button>
@@ -323,17 +328,67 @@ function fmtDT(iso,g,short){ const a=fmtD(iso,short), b=g||""; return (a||b)? `$
 function todayISO(){ const t=new Date(); return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); }
 function nowHM(){ const t=new Date(); return String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0"); }
 let toastT;
-function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("on"),1600); }
+/* ================= Языки интерфейса ================= */
+const LANGS = [["ru","Беларусь · Русский"],["ua","Україна · Українська"],["pl","Polska · Polski"]];
+function lang(){ try{ return (DB && DB.lang) || "ru"; }catch(e){ return "ru"; } }
+const I18N = { ua: {"Печать / PDF": "Друк / PDF", "Новая карта": "Нова карта", "Переименовать": "Перейменувати", "Пустые": "Порожні", "Пустые ✓": "Порожні ✓", "Копия ⤴": "Копія ⤴", "Экспорт": "Експорт", "Импорт": "Імпорт", "Удалить": "Видалити", "Очистить": "Очистити", "Восстановить": "Відновити", "Сделать": "Зробити", "Сейчас": "Зараз", "Сег.": "Сьог.", "Сейч.": "Зараз", "Карта": "Карта", "Заправки": "Заправки", "Расходы": "Витрати", "Инструкция": "Інструкція", "Numer Wyjazdu — номер выезда": "Numer Wyjazdu — номер виїзду", "Numer Teczki — номер папки": "Numer Teczki — номер теки", "WYJAZD Z BAZY — начало работы": "WYJAZD Z BAZY — початок роботи", "POWRÓT NA BAZĘ — окончание работы": "POWRÓT NA BAZĘ — кінець роботи", "Bus — выезд с базы": "Bus — виїзд з бази", "Bus — возврат на базу": "Bus — повернення на базу", "Wyjazd Busem z bazy — выезд с базы": "Wyjazd Busem z bazy — виїзд з бази", "Przyjazd Busem do samochodu — приезд к тягачу": "Przyjazd Busem do samochodu — приїзд до тягача", "Powrót Busem do Bazy — выезд к базе": "Powrót Busem do Bazy — виїзд до бази", "Przyjazd Busem do bazy — приезд на базу": "Przyjazd Busem do bazy — приїзд на базу", "Stan licznika KM — километраж": "Stan licznika KM — кілометраж", "Stan Paliwa — топливо, %": "Stan Paliwa — пальне, %", "Załadunek — загрузка": "Załadunek — завантаження", "Wyładunek — выгрузка": "Wyładunek — вивантаження", "Miejscowość (левая колонка)": "Miejscowość (ліва колонка)", "Miejscowość (правая колонка)": "Miejscowość (права колонка)", "Data / Godz. — ПОСЛЕ окончания загрузки": "Data / Godz. — ПІСЛЯ завершення завантаження", "Data / Godz. — ПОСЛЕ окончания выгрузки": "Data / Godz. — ПІСЛЯ завершення вивантаження", "Za co — за что": "Za co — за що", "Podpisy — подписи": "Podpisy — підписи", "Pierwszy kierowca — расписаться пальцем": "Pierwszy kierowca — розписатися пальцем", "Drugi kierowca — расписаться пальцем": "Drugi kierowca — розписатися пальцем", "Примечания на бланк": "Примітки на бланк", "Дорожная карта. Инструкция по выполнению": "Дорожня карта. Інструкція із заповнення", "Резервные копии": "Резервні копії", "Копии внутри устройства": "Копії всередині пристрою", "Сохранить копию сейчас": "Зберегти копію зараз", "Как это работает": "Як це працює", "Итого по картам": "Разом за картками", "Всего": "Разом", "Мои карты": "Мої картки", "Банковские": "Банківські", "Топливные": "Паливні", "+ Добавить строку": "+ Додати рядок", "+ Заправка ON": "+ Заправка ON", "+ Заправка AdBlue": "+ Заправка AdBlue", "+ Заправка холодильника": "+ Заправка холодильника", "+ Покупка": "+ Покупка", "+ Оплата": "+ Оплата", "+ Сервис": "+ Сервіс", "+ Штраф": "+ Штраф", "+ Своя покупка": "+ Своя покупка", "+ чек": "+ чек", "+ добавить": "+ додати", "＋ Своя карта…": "＋ Своя картка…", "готово": "готово", "неполно": "неповно", "пусто": "порожньо", "нет загрузки": "немає завантаження", "нет выгрузки": "немає вивантаження", "подпись сохранена": "підпис збережено", "пока нет": "поки немає", "ни разу": "жодного разу", "без карты": "без картки", "своя карта / наличные": "своя картка / готівка", "т / кг": "т / кг", "сохраняю…": "зберігаю…", "Пусто.": "Порожньо.", "Пока нет.": "Поки немає.", "Пока пусто. Добавьте первую загрузку.": "Поки порожньо. Додайте перше завантаження.", "Копия ещё ни разу не сохранялась.": "Копію ще жодного разу не збережено.", "Последняя копия — сегодня.": "Остання копія — сьогодні.", "Эта страница всегда печатается 4-й — как в оригинальном комплекте.": "Ця сторінка завжди друкується четвертою — як в оригінальному комплекті.", "Раз в сутки приложение само кладёт файл копии в Загрузки. Кнопка «Копия ⤴» вверху отправляет его в облако или мессенджер одним тапом — это единственное, что спасёт данные, если устройство пропадёт.": "Раз на добу застосунок сам кладе файл копії в Завантаження. Кнопка «Копія ⤴» вгорі надсилає його в хмару або месенджер одним дотиком — це єдине, що врятує дані, якщо пристрій зникне.", "Показания переписываем с компьютера в тягаче: перед выездом с базы — Początek, после приезда — Koniec.": "Показники переписуємо з комп'ютера в тягачі: перед виїздом з бази — Początek, після приїзду — Koniec.", "Вписываем ВСЕ загрузки и ВСЕ выгрузки. При перецепке: получая груз — Załadunek, передавая — Wyładunek. Вес переписываем с CMR.": "Вписуємо ВСІ завантаження і ВСІ вивантаження. При перечіпці: отримуючи вантаж — Załadunek, передаючи — Wyładunek. Вагу переписуємо з CMR.", "Заправку холодильника берём отдельным чеком, в Trimble вписываем как «paliwo», на чеке подписываем «chłodnia». Не суммируем — каждый бак отдельной строкой.": "Заправку холодильника беремо окремим чеком, у Trimble вписуємо як «paliwo», на чеку підписуємо «chłodnia». Не сумуємо — кожен бак окремим рядком.", "Только ON тягача — AdBlue и холодильник сюда не идут. Справа — сколько чеков.": "Тільки ON тягача — AdBlue і холодильник сюди не входять. Праворуч — скільки чеків.", "Каждая валюта считается отдельно — ничего не смешивается. Справа — сколько строк.": "Кожна валюта рахується окремо — нічого не змішується. Праворуч — скільки рядків.", "В Польше по карте фирмы (Visa / Mastercard) обязательно берём FAKTURA VAT. Нет чека — пишем oświadczenie.": "У Польщі за карткою фірми (Visa / Mastercard) обов'язково беремо FAKTURA VAT. Немає чека — пишемо oświadczenie.", "Пиши только название и, если нужно, 4 последние цифры — полный номер и PIN в приложение вносить не надо.": "Пиши лише назву і, якщо треба, 4 останні цифри — повний номер і PIN у застосунок вносити не треба.", "Подпись встанет на бланке над линией «Pierwszy kierowca» / «Drugi kierowca». Если оставить пусто — напечатается чистая линия, как в оригинале.": "Підпис стане на бланку над лінією «Pierwszy kierowca» / «Drugi kierowca». Якщо залишити порожнім — надрукується чиста лінія, як в оригіналі.", "Всё сохраняется прямо в телефоне — интернет не нужен. Кнопки «Сег.», «Сейч.» и «Сейчас» подставляют дату и время. Кнопка GPS определяет страну по координатам офлайн, а если есть сеть — подтягивает и город.": "Усе зберігається прямо в телефоні — інтернет не потрібен. Кнопки «Сьог.», «Зараз» підставляють дату й час. Кнопка GPS визначає країну за координатами офлайн, а якщо є мережа — підтягує і місто.", "Печать: «Печать / PDF» → в Safari выбираете принтер или «Сохранить в Файлы» (PDF). Бланк печатается 1-в-1 как оригинал.": "Друк: «Друк / PDF» → у Safari обираєте принтер або «Зберегти у Файли» (PDF). Бланк друкується 1-в-1 як оригінал.", "Чтобы открывалось в один тап: откройте файл в Safari → «Поделиться» → «На экран \"Домой\"».": "Щоб відкривалося одним дотиком: відкрийте файл у Safari → «Поділитися» → «На екран \"Додому\"».", "Карта создана": "Карту створено", "Карта добавлена": "Картку додано", "Карта загружена": "Карту завантажено", "Это единственная карта": "Це єдина карта", "Подсветка выключена": "Підсвічування вимкнено", "Пустые графы подсвечены": "Порожні графи підсвічено", "Копия сохранена в Загрузки": "Копію збережено в Завантаження", "Восстановлено": "Відновлено", "Не удалось восстановить": "Не вдалося відновити", "Файл не читается": "Файл не читається", "Дата и время подставлены": "Дату й час підставлено", "Добавлено": "Додано", "Подпись очищена": "Підпис очищено", "Сначала впиши литры первого чека": "Спочатку впиши літри першого чека", "Геолокация недоступна": "Геолокація недоступна", "Нет доступа к геолокации": "Немає доступу до геолокації", "Страна не определена": "Країну не визначено", "Удалить запись?": "Видалити запис?", "Восстановить состояние из копии? Текущие карты будут заменены.": "Відновити стан з копії? Поточні карти буде замінено.", "Название карты:": "Назва карти:", "Название новой карты:": "Назва нової карти:", "Название карты (можно с 4 последними цифрами):": "Назва картки (можна з 4 останніми цифрами):"}, pl: {"Печать / PDF": "Wydruk / PDF", "Новая карта": "Nowa karta", "Переименовать": "Zmień nazwę", "Пустые": "Puste", "Пустые ✓": "Puste ✓", "Копия ⤴": "Kopia ⤴", "Экспорт": "Eksport", "Импорт": "Import", "Удалить": "Usuń", "Очистить": "Wyczyść", "Восстановить": "Przywróć", "Сделать": "Zrób", "Сейчас": "Teraz", "Сег.": "Dziś", "Сейч.": "Teraz", "Карта": "Karta", "Заправки": "Tankowania", "Расходы": "Koszty", "Инструкция": "Instrukcja", "Numer Wyjazdu — номер выезда": "Numer Wyjazdu", "Numer Teczki — номер папки": "Numer Teczki", "WYJAZD Z BAZY — начало работы": "WYJAZD Z BAZY — początek pracy", "POWRÓT NA BAZĘ — окончание работы": "POWRÓT NA BAZĘ — koniec pracy", "Bus — выезд с базы": "Bus — wyjazd z bazy", "Bus — возврат на базу": "Bus — powrót na bazę", "Wyjazd Busem z bazy — выезд с базы": "Wyjazd Busem z bazy", "Przyjazd Busem do samochodu — приезд к тягачу": "Przyjazd Busem do samochodu", "Powrót Busem do Bazy — выезд к базе": "Powrót Busem do Bazy", "Przyjazd Busem do bazy — приезд на базу": "Przyjazd Busem do bazy", "Stan licznika KM — километраж": "Stan licznika KM", "Stan Paliwa — топливо, %": "Stan Paliwa, %", "Załadunek — загрузка": "Załadunek", "Wyładunek — выгрузка": "Wyładunek", "Miejscowość (левая колонка)": "Miejscowość (lewa kolumna)", "Miejscowość (правая колонка)": "Miejscowość (prawa kolumna)", "Data / Godz. — ПОСЛЕ окончания загрузки": "Data / Godz. — PO zakończeniu załadunku", "Data / Godz. — ПОСЛЕ окончания выгрузки": "Data / Godz. — PO zakończeniu wyładunku", "Za co — за что": "Za co", "Podpisy — подписи": "Podpisy", "Pierwszy kierowca — расписаться пальцем": "Pierwszy kierowca — podpis palcem", "Drugi kierowca — расписаться пальцем": "Drugi kierowca — podpis palcem", "Примечания на бланк": "Uwagi na formularz", "Дорожная карта. Инструкция по выполнению": "Karta drogowa. Instrukcja wypełniania", "Резервные копии": "Kopie zapasowe", "Копии внутри устройства": "Kopie w urządzeniu", "Сохранить копию сейчас": "Zapisz kopię teraz", "Как это работает": "Jak to działa", "Итого по картам": "Razem wg kart", "Всего": "Razem", "Мои карты": "Moje karty", "Банковские": "Bankowe", "Топливные": "Paliwowe", "+ Добавить строку": "+ Dodaj wiersz", "+ Заправка ON": "+ Tankowanie ON", "+ Заправка AdBlue": "+ Tankowanie AdBlue", "+ Заправка холодильника": "+ Tankowanie chłodni", "+ Покупка": "+ Zakup", "+ Оплата": "+ Opłata", "+ Сервис": "+ Serwis", "+ Штраф": "+ Mandat", "+ Своя покупка": "+ Zakup własną kartą", "+ чек": "+ paragon", "+ добавить": "+ dodaj", "＋ Своя карта…": "＋ Własna karta…", "готово": "gotowe", "неполно": "niepełne", "пусто": "pusto", "нет загрузки": "brak załadunku", "нет выгрузки": "brak wyładunku", "подпись сохранена": "podpis zapisany", "пока нет": "jeszcze nie", "ни разу": "ani razu", "без карты": "bez karty", "своя карта / наличные": "własna karta / gotówka", "т / кг": "t / kg", "сохраняю…": "zapisuję…", "Пусто.": "Pusto.", "Пока нет.": "Jeszcze nie ma.", "Пока пусто. Добавьте первую загрузку.": "Na razie pusto. Dodaj pierwszy załadunek.", "Копия ещё ни разу не сохранялась.": "Kopia nie została jeszcze ani razu zapisana.", "Последняя копия — сегодня.": "Ostatnia kopia — dzisiaj.", "Эта страница всегда печатается 4-й — как в оригинальном комплекте.": "Ta strona zawsze drukuje się jako czwarta — jak w oryginalnym komplecie.", "Раз в сутки приложение само кладёт файл копии в Загрузки. Кнопка «Копия ⤴» вверху отправляет его в облако или мессенджер одним тапом — это единственное, что спасёт данные, если устройство пропадёт.": "Raz na dobę aplikacja sama zapisuje plik kopii w Pobranych. Przycisk «Kopia ⤴» u góry wysyła go do chmury lub komunikatora jednym dotknięciem — to jedyne, co uratuje dane, jeśli urządzenie zniknie.", "Показания переписываем с компьютера в тягаче: перед выездом с базы — Początek, после приезда — Koniec.": "Stany przepisujemy z komputera w ciągniku: przed wyjazdem z bazy — Początek, po przyjeździe — Koniec.", "Вписываем ВСЕ загрузки и ВСЕ выгрузки. При перецепке: получая груз — Załadunek, передавая — Wyładunek. Вес переписываем с CMR.": "Wpisujemy WSZYSTKIE załadunki i WSZYSTKIE wyładunki. Przy przeczepce: odbierając ładunek — Załadunek, przekazując — Wyładunek. Wagę przepisujemy z CMR.", "Заправку холодильника берём отдельным чеком, в Trimble вписываем как «paliwo», на чеке подписываем «chłodnia». Не суммируем — каждый бак отдельной строкой.": "Tankowanie chłodni bierzemy na osobny paragon, w Trimble wpisujemy jako «paliwo», na paragonie podpisujemy «chłodnia». Nie sumujemy — każdy zbiornik osobnym wierszem.", "Только ON тягача — AdBlue и холодильник сюда не идут. Справа — сколько чеков.": "Tylko ON ciągnika — AdBlue i chłodnia tu nie wchodzą. Po prawej — ile paragonów.", "Каждая валюта считается отдельно — ничего не смешивается. Справа — сколько строк.": "Każda waluta liczona jest osobno — nic się nie miesza. Po prawej — ile wierszy.", "В Польше по карте фирмы (Visa / Mastercard) обязательно берём FAKTURA VAT. Нет чека — пишем oświadczenie.": "W Polsce kartą firmową (Visa / Mastercard) obowiązkowo bierzemy FAKTURĘ VAT. Brak paragonu — piszemy oświadczenie.", "Пиши только название и, если нужно, 4 последние цифры — полный номер и PIN в приложение вносить не надо.": "Wpisuj tylko nazwę i w razie potrzeby 4 ostatnie cyfry — pełnego numeru i PIN-u nie wpisujemy do aplikacji.", "Подпись встанет на бланке над линией «Pierwszy kierowca» / «Drugi kierowca». Если оставить пусто — напечатается чистая линия, как в оригинале.": "Podpis stanie na formularzu nad linią «Pierwszy kierowca» / «Drugi kierowca». Jeśli zostawisz puste — wydrukuje się czysta linia, jak w oryginale.", "Всё сохраняется прямо в телефоне — интернет не нужен. Кнопки «Сег.», «Сейч.» и «Сейчас» подставляют дату и время. Кнопка GPS определяет страну по координатам офлайн, а если есть сеть — подтягивает и город.": "Wszystko zapisuje się bezpośrednio w telefonie — internet nie jest potrzebny. Przyciski «Dziś» i «Teraz» wstawiają datę i godzinę. Przycisk GPS ustala kraj z współrzędnych offline, a przy zasięgu podpowiada też miasto.", "Печать: «Печать / PDF» → в Safari выбираете принтер или «Сохранить в Файлы» (PDF). Бланк печатается 1-в-1 как оригинал.": "Wydruk: «Wydruk / PDF» → w Safari wybierasz drukarkę albo «Zapisz w Plikach» (PDF). Formularz drukuje się 1:1 jak oryginał.", "Чтобы открывалось в один тап: откройте файл в Safari → «Поделиться» → «На экран \"Домой\"».": "Aby otwierało się jednym dotknięciem: otwórz plik w Safari → «Udostępnij» → «Do ekranu początkowego».", "Карта создана": "Karta utworzona", "Карта добавлена": "Karta dodana", "Карта загружена": "Karta wczytana", "Это единственная карта": "To jedyna karta", "Подсветка выключена": "Podświetlenie wyłączone", "Пустые графы подсвечены": "Puste pola podświetlone", "Копия сохранена в Загрузки": "Kopia zapisana w Pobranych", "Восстановлено": "Przywrócono", "Не удалось восстановить": "Nie udało się przywrócić", "Файл не читается": "Nie można odczytać pliku", "Дата и время подставлены": "Data i godzina wstawione", "Добавлено": "Dodano", "Подпись очищена": "Podpis wyczyszczony", "Сначала впиши литры первого чека": "Najpierw wpisz litry z pierwszego paragonu", "Геолокация недоступна": "Geolokalizacja niedostępna", "Нет доступа к геолокации": "Brak dostępu do geolokalizacji", "Страна не определена": "Nie ustalono kraju", "Удалить запись?": "Usunąć wpis?", "Восстановить состояние из копии? Текущие карты будут заменены.": "Przywrócić stan z kopii? Bieżące karty zostaną zastąpione.", "Название карты:": "Nazwa karty:", "Название новой карты:": "Nazwa nowej karty:", "Название карты (можно с 4 последними цифрами):": "Nazwa karty (można z 4 ostatnimi cyframi):"} };
+const IPAT = { ua: [[new RegExp("^Последняя копия — (\\d+) дн\\. назад\\.$"),"Остання копія — $1 дн. тому."],[new RegExp("^Строка (\\d+)$"),"Рядок $1"],[new RegExp("^(\\d+) / (\\d+) строк на бланке$"),"$1 / $2 рядків на бланку"],[new RegExp("^сохранено (.+)$"),"збережено $1"],[new RegExp("^Удалить «(.+)»\\? Данные пропадут\\.$"),"Видалити «$1»? Дані зникнуть."],[new RegExp("^Убрать «(.+)» из списка\\? В уже заполненных строках она останется\\.$"),"Прибрати «$1» зі списку? У вже заповнених рядках вона залишиться."],[new RegExp("^Копии карты нет (.+)\\. Если планшет пропадёт — данные пропадут вместе с ним\\.$"),"Копії карти немає $1. Якщо планшет зникне — дані зникнуть разом з ним."],[new RegExp("^уже (\\d+) дн\\.$"),"уже $1 дн."]], pl: [[new RegExp("^Последняя копия — (\\d+) дн\\. назад\\.$"),"Ostatnia kopia — $1 dni temu."],[new RegExp("^Строка (\\d+)$"),"Wiersz $1"],[new RegExp("^(\\d+) / (\\d+) строк на бланке$"),"$1 / $2 wierszy na formularzu"],[new RegExp("^сохранено (.+)$"),"zapisano $1"],[new RegExp("^Удалить «(.+)»\\? Данные пропадут\\.$"),"Usunąć «$1»? Dane przepadną."],[new RegExp("^Убрать «(.+)» из списка\\? В уже заполненных строках она останется\\.$"),"Usunąć «$1» z listy? W już wypełnionych wierszach pozostanie."],[new RegExp("^Копии карты нет (.+)\\. Если планшет пропадёт — данные пропадут вместе с ним\\.$"),"Nie ma kopii karty $1. Jeśli tablet zniknie — dane znikną razem z nim."],[new RegExp("^уже (\\d+) дн\\.$"),"już $1 dni"]] };
+const IREV = (function(){ const m={}; for(const L of ["ua","pl"]){ const d=I18N[L]; for(const k in d){ m[nrm(d[k])] = k; } } return m; })();
+function nrm(s){ return String(s).trim().replace(/\s+/g," "); }
+function T(s, depth){
+  if(s === null || s === undefined) return s;
+  const raw = String(s), k = nrm(raw);
+  if(!k) return raw;
+  const ru = IREV[k] || k;
+  const L = lang();
+  if(L === "ru") return ru;
+  const d = I18N[L] || {};
+  if(d[ru] !== undefined) return d[ru];
+  const pats = IPAT[L] || [];
+  for(const pair of pats){
+    const m = ru.match(pair[0]);
+    if(m) return pair[1].replace(/\$(\d)/g, function(_, n){
+      const g = m[+n] === undefined ? "" : m[+n];
+      return (depth || 0) > 1 ? g : T(g, (depth || 0) + 1);
+    });
+  }
+  return raw;
+}
+function translateTree(root){
+  if(!root) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  const arr = []; while(w.nextNode()) arr.push(w.currentNode);
+  arr.forEach(function(n){
+    const p = n.parentElement; if(!p) return;
+    if(p.closest("#langSel,#cardSel,#print,select[data-card]")) return;
+    const v = n.nodeValue; if(!/\S/.test(v)) return;
+    const m = v.match(/^(\s*)([\s\S]*?)(\s*)$/);
+    const t = T(m[2]);
+    if(t !== m[2]) n.nodeValue = m[1] + t + m[3];
+  });
+  root.querySelectorAll("[placeholder]").forEach(function(el){
+    const cur = el.getAttribute("placeholder"); const t = T(cur);
+    if(t !== cur) el.setAttribute("placeholder", t);
+  });
+}
+function applyLang(){
+  const L = lang();
+  document.documentElement.lang = L === "ua" ? "uk" : (L === "pl" ? "pl" : "ru");
+  ["header","nav","main","#bkWarn"].forEach(function(sel){ translateTree(document.querySelector(sel)); });
+  const s = document.getElementById("langSel"); if(s) s.value = L;
+}
+
+function toast(msg){ const t=$("#toast"); t.textContent=T(msg); t.classList.add("on"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("on"),1600); }
 
 /* ================= Сохранение ================= */
 let saveT;
 function save(now){
-  $("#saveState").textContent = "сохраняю…";
+  $("#saveState").textContent = T("сохраняю…");
   clearTimeout(saveT);
   const go = async ()=>{
     await Store.set(KEY, JSON.stringify(DB));
     snapshot();
-    $("#saveState").textContent = "сохранено " + nowHM();
+    $("#saveState").textContent = T("сохранено " + nowHM());
   };
   if(now) go(); else saveT = setTimeout(go, 400);
 }
@@ -585,10 +640,10 @@ function paintRow(el){
   const b = el.querySelector(".rst");
   if(b){
     b.className = "rst" + (st.full ? " done" : " todo");
-    b.textContent = st.full ? "готово" : (any ? st.label : "пусто");
+    b.textContent = T(st.full ? "готово" : (any ? st.label : "пусто"));
   }
   const sm = el.querySelector(".rsum");
-  if(sm && st.full) sm.innerHTML = rowSummary(list, r);
+  if(sm && st.full){ sm.innerHTML = rowSummary(list, r); translateTree(sm); }
 }
 function paintRows(){ document.querySelectorAll(".item[data-row]").forEach(paintRow); paintEmpty(); }
 
@@ -731,22 +786,16 @@ function renderKoszty(){
   ${renderMyCards()}`;
 }
 
-const INSTR = [
- "Чистые бланки выдаются на базе. Номер машины, имя и фамилия первого и второго водителя уже будут заполнены — нужно проверить только правильность данных.",
- "В графе «WYJAZD» вписываем день и время начала работы, в графе «POWRÓT» — дату и время окончания работы. Если вы доезжаете с базы до тягача автобусом, то сначала в графе «WYJAZD BUSEM» — дату и время начала работы (выезд с базы), в графе «PRZYJAZD BUSEM» — дату и время приезда до тягача. Если возвращаетесь до базы на автобусе, то в графе «POWRÓT BUSEM» — дату и время выезда до базы, в графе «PRZYJAZD BUSEM» — дату и время приезда на базу (окончание работы).",
- "Диета начисляется в течение 14 дней после закрытия карты. Есть возможность закрытия карты после 1 месяца командировки (если вы в трассе 2, 3 месяца или дольше). В таком случае обязательно закрываем карту после выгрузки: в графе «POWRÓT» указываем дату и время последней выгрузки, вписываем километраж на этот момент и stany samochodu. Отдаём карту водителям, которые съезжают на базу, и начинаем новую карту.",
- "Если происходят изменения в экипаже либо замена тягача — обязательно заканчиваем текущую карту и начинаем новую.",
- "Переписываем stany samochodu с компьютера в тягаче перед выездом с базы (początek) и после приезда на базу (koniec). Stan licznika KM — километраж, stan licznika zużycia paliwa z komputera — общий расход топлива, stan paliwa — количество топлива (в %), stan Ad-Blue — количество Ad-Blue (в %).",
- "В графах «ZAŁADUNEK» и «WYŁADUNEK» вписываем номер заявки (nr zlecenia), страну, город, дату и время ПОСЛЕ ЗАВЕРШЕНИЯ загрузки/выгрузки, километраж в этот момент и вес груза (переписываем с CMR). Вписываем ВСЕ загрузки и ВСЕ выгрузки. В случае перецепки: получая груз — данные в «ZAŁADUNEK», передавая груз — в «WYŁADUNEK».",
- "Вписываем все заправки топлива и Ad-Blue. НЕ СУММИРУЕМ — заправку каждого бака вписываем отдельно. В Trimble тоже ничего не суммируем: сколько позиций на чеке, столько должно быть позиций в Trimble. Все чеки должны быть вписаны в Trimble, не только топливо. Если не выдали чек за топливо — пометка в карте «brak paragonu» и ввод в Trimble. Вписываем дату, количество литров, полный бак или нет, километраж, какой картой заплатили.",
- "Заправку холодильника вписываем отдельно, берём отдельный чек. В Trimble вписываем как «paliwo», на чеке подписываем «chłodnia».",
- "Если на чеке не указана сумма — не оставляем в Trimble пустой графы, вписываем «1».",
- "У вас будет две/три карты: VISA и Mastercard. Все покупки этими картами вписываете в таблицу: дата — за что заплатили — какой картой — сумма. ВАЖНО! Если оплачиваете этими картами в Польше — обязательно нужно взять FAKTURA VAT. Если не выдали чек — нужно написать объяснительную (oświadczenie). Если покупаете своей картой или своими наличными — тоже пишем в таблицу: дату, за что заплатили, сумму, имя и фамилию водителя. Если снимаете наличные с карты фирмы, это тоже необходимо указать (либо оставляете их себе и мы вычитаем их из диеты, либо возвращаете вместе со всеми документами).",
- "На каждый расход должен быть документ: чек, фактура или oświadczenie, с актуальной датой, страной, суммой, литрами. Все чеки должны быть вписаны в Trimble. Чеки лучше скрепить и сложить вместе с картой в отдельный файлик, CMR-ки — в отдельный файлик."
-];
+const INSTR_L = {
+  ru: ["Чистые бланки выдаются на базе. Номер машины, имя и фамилия первого и второго водителя уже будут заполнены — нужно проверить только правильность данных.", "В графе «WYJAZD» вписываем день и время начала работы, в графе «POWRÓT» — дату и время окончания работы. Если вы доезжаете с базы до тягача автобусом, то сначала в графе «WYJAZD BUSEM» — дату и время начала работы (выезд с базы), в графе «PRZYJAZD BUSEM» — дату и время приезда до тягача. Если возвращаетесь до базы на автобусе, то в графе «POWRÓT BUSEM» — дату и время выезда до базы, в графе «PRZYJAZD BUSEM» — дату и время приезда на базу (окончание работы).", "Диета начисляется в течение 14 дней после закрытия карты. Есть возможность закрытия карты после 1 месяца командировки (если вы в трассе 2, 3 месяца или дольше). В таком случае обязательно закрываем карту после выгрузки: в графе «POWRÓT» указываем дату и время последней выгрузки, вписываем километраж на этот момент и stany samochodu. Отдаём карту водителям, которые съезжают на базу, и начинаем новую карту.", "Если происходят изменения в экипаже либо замена тягача — обязательно заканчиваем текущую карту и начинаем новую.", "Переписываем stany samochodu с компьютера в тягаче перед выездом с базы (początek) и после приезда на базу (koniec). Stan licznika KM — километраж, stan licznika zużycia paliwa z komputera — общий расход топлива, stan paliwa — количество топлива (в %), stan Ad-Blue — количество Ad-Blue (в %).", "В графах «ZAŁADUNEK» и «WYŁADUNEK» вписываем номер заявки (nr zlecenia), страну, город, дату и время ПОСЛЕ ЗАВЕРШЕНИЯ загрузки/выгрузки, километраж в этот момент и вес груза (переписываем с CMR). Вписываем ВСЕ загрузки и ВСЕ выгрузки. В случае перецепки: получая груз — данные в «ZAŁADUNEK», передавая груз — в «WYŁADUNEK».", "Вписываем все заправки топлива и Ad-Blue. НЕ СУММИРУЕМ — заправку каждого бака вписываем отдельно. В Trimble тоже ничего не суммируем: сколько позиций на чеке, столько должно быть позиций в Trimble. Все чеки должны быть вписаны в Trimble, не только топливо. Если не выдали чек за топливо — пометка в карте «brak paragonu» и ввод в Trimble. Вписываем дату, количество литров, полный бак или нет, километраж, какой картой заплатили.", "Заправку холодильника вписываем отдельно, берём отдельный чек. В Trimble вписываем как «paliwo», на чеке подписываем «chłodnia».", "Если на чеке не указана сумма — не оставляем в Trimble пустой графы, вписываем «1».", "У вас будет две/три карты: VISA и Mastercard. Все покупки этими картами вписываете в таблицу: дата — за что заплатили — какой картой — сумма. ВАЖНО! Если оплачиваете этими картами в Польше — обязательно нужно взять FAKTURA VAT. Если не выдали чек — нужно написать объяснительную (oświadczenie). Если покупаете своей картой или своими наличными — тоже пишем в таблицу: дату, за что заплатили, сумму, имя и фамилию водителя. Если снимаете наличные с карты фирмы, это тоже необходимо указать (либо оставляете их себе и мы вычитаем их из диеты, либо возвращаете вместе со всеми документами).", "На каждый расход должен быть документ: чек, фактура или oświadczenie, с актуальной датой, страной, суммой, литрами. Все чеки должны быть вписаны в Trimble. Чеки лучше скрепить и сложить вместе с картой в отдельный файлик, CMR-ки — в отдельный файлик."],
+  ua: ["Чисті бланки видаються на базі. Номер машини, ім'я та прізвище першого і другого водія вже будуть заповнені — треба перевірити лише правильність даних.", "У графі «WYJAZD» вписуємо день і час початку роботи, у графі «POWRÓT» — дату й час закінчення роботи. Якщо ви доїжджаєте з бази до тягача автобусом, то спочатку в графі «WYJAZD BUSEM» — дату й час початку роботи (виїзд з бази), у графі «PRZYJAZD BUSEM» — дату й час приїзду до тягача. Якщо повертаєтеся до бази автобусом, то в графі «POWRÓT BUSEM» — дату й час виїзду до бази, у графі «PRZYJAZD BUSEM» — дату й час приїзду на базу (закінчення роботи).", "Дієта нараховується протягом 14 днів після закриття карти. Є можливість закрити карту після 1 місяця відрядження (якщо ви в трасі 2, 3 місяці або довше). У такому разі обов'язково закриваємо карту після вивантаження: у графі «POWRÓT» вказуємо дату й час останнього вивантаження, вписуємо кілометраж на цей момент і stany samochodu. Віддаємо карту водіям, які їдуть на базу, і починаємо нову карту.", "Якщо відбуваються зміни в екіпажі або заміна тягача — обов'язково закінчуємо поточну карту і починаємо нову.", "Переписуємо stany samochodu з комп'ютера в тягачі перед виїздом з бази (początek) і після приїзду на базу (koniec). Stan licznika KM — кілометраж, stan licznika zużycia paliwa z komputera — загальна витрата пального, stan paliwa — кількість пального (у %), stan Ad-Blue — кількість Ad-Blue (у %).", "У графах «ZAŁADUNEK» і «WYŁADUNEK» вписуємо номер заявки (nr zlecenia), країну, місто, дату й час ПІСЛЯ ЗАВЕРШЕННЯ завантаження/вивантаження, кілометраж у цей момент і вагу вантажу (переписуємо з CMR). Вписуємо ВСІ завантаження і ВСІ вивантаження. У разі перечіпки: отримуючи вантаж — дані в «ZAŁADUNEK», передаючи вантаж — у «WYŁADUNEK».", "Вписуємо всі заправки пального та Ad-Blue. НЕ СУМУЄМО — заправку кожного бака вписуємо окремо. У Trimble теж нічого не сумуємо: скільки позицій на чеку, стільки має бути позицій у Trimble. Усі чеки мають бути вписані в Trimble, не лише пальне. Якщо не видали чек за пальне — позначка в карті «brak paragonu» і введення в Trimble. Вписуємо дату, кількість літрів, повний бак чи ні, кілометраж, якою карткою заплатили.", "Заправку холодильника вписуємо окремо, беремо окремий чек. У Trimble вписуємо як «paliwo», на чеку підписуємо «chłodnia».", "Якщо на чеку не вказана сума — не залишаємо в Trimble порожньої графи, вписуємо «1».", "У вас буде дві/три картки: VISA і Mastercard. Усі покупки цими картками вписуєте в таблицю: дата — за що заплатили — якою карткою — сума. ВАЖЛИВО! Якщо оплачуєте цими картками в Польщі — обов'язково треба взяти FAKTURA VAT. Якщо не видали чек — треба написати пояснювальну (oświadczenie). Якщо купуєте своєю карткою або своєю готівкою — теж пишемо в таблицю: дату, за що заплатили, суму, ім'я та прізвище водія. Якщо знімаєте готівку з картки фірми, це теж необхідно вказати (або залишаєте її собі і ми вирахуємо її з дієти, або повертаєте разом з усіма документами).", "На кожну витрату має бути документ: чек, фактура або oświadczenie, з актуальною датою, країною, сумою, літрами. Усі чеки мають бути вписані в Trimble. Чеки краще скріпити і скласти разом з картою в окремий файлик, CMR-ки — в окремий файлик."],
+  pl: ["Czyste blankiety wydawane są na bazie. Numer samochodu, imię i nazwisko pierwszego i drugiego kierowcy będą już wpisane — należy sprawdzić tylko poprawność danych.", "W rubryce «WYJAZD» wpisujemy dzień i godzinę rozpoczęcia pracy, w rubryce «POWRÓT» — datę i godzinę zakończenia pracy. Jeśli z bazy do ciągnika dojeżdżacie busem, to najpierw w rubryce «WYJAZD BUSEM» — datę i godzinę rozpoczęcia pracy (wyjazd z bazy), w rubryce «PRZYJAZD BUSEM» — datę i godzinę przyjazdu do ciągnika. Jeśli wracacie do bazy busem, to w rubryce «POWRÓT BUSEM» — datę i godzinę wyjazdu do bazy, w rubryce «PRZYJAZD BUSEM» — datę i godzinę przyjazdu na bazę (zakończenie pracy).", "Dieta naliczana jest w ciągu 14 dni po zamknięciu karty. Istnieje możliwość zamknięcia karty po 1 miesiącu delegacji (jeśli jesteście w trasie 2, 3 miesiące lub dłużej). W takim przypadku obowiązkowo zamykamy kartę po wyładunku: w rubryce «POWRÓT» podajemy datę i godzinę ostatniego wyładunku, wpisujemy przebieg na ten moment i stany samochodu. Oddajemy kartę kierowcom, którzy zjeżdżają na bazę, i zaczynamy nową kartę.", "Jeśli następują zmiany w załodze albo wymiana ciągnika — obowiązkowo kończymy bieżącą kartę i zaczynamy nową.", "Przepisujemy stany samochodu z komputera w ciągniku przed wyjazdem z bazy (początek) i po przyjeździe na bazę (koniec). Stan licznika KM — przebieg, stan licznika zużycia paliwa z komputera — całkowite zużycie paliwa, stan paliwa — ilość paliwa (w %), stan Ad-Blue — ilość Ad-Blue (w %).", "W rubrykach «ZAŁADUNEK» i «WYŁADUNEK» wpisujemy numer zlecenia (nr zlecenia), kraj, miasto, datę i godzinę PO ZAKOŃCZENIU załadunku/wyładunku, przebieg w tym momencie oraz wagę ładunku (przepisujemy z CMR). Wpisujemy WSZYSTKIE załadunki i WSZYSTKIE wyładunki. W przypadku przeczepki: odbierając ładunek — dane w «ZAŁADUNEK», przekazując ładunek — w «WYŁADUNEK».", "Wpisujemy wszystkie tankowania paliwa i Ad-Blue. NIE SUMUJEMY — tankowanie każdego zbiornika wpisujemy osobno. W Trimble też niczego nie sumujemy: ile pozycji na paragonie, tyle powinno być pozycji w Trimble. Wszystkie paragony muszą być wpisane do Trimble, nie tylko paliwo. Jeśli nie wydano paragonu za paliwo — adnotacja w karcie «brak paragonu» i wpis do Trimble. Wpisujemy datę, liczbę litrów, czy do pełna, przebieg, jaką kartą zapłacono.", "Tankowanie chłodni wpisujemy osobno, bierzemy osobny paragon. W Trimble wpisujemy jako «paliwo», na paragonie podpisujemy «chłodnia».", "Jeśli na paragonie nie ma kwoty — nie zostawiamy w Trimble pustej rubryki, wpisujemy «1».", "Będziecie mieli dwie/trzy karty: VISA i Mastercard. Wszystkie zakupy tymi kartami wpisujecie do tabeli: data — za co zapłacono — jaką kartą — kwota. WAŻNE! Jeśli płacicie tymi kartami w Polsce — obowiązkowo trzeba wziąć FAKTURĘ VAT. Jeśli nie wydano paragonu — trzeba napisać oświadczenie. Jeśli kupujecie własną kartą lub własną gotówką — też wpisujemy do tabeli: datę, za co zapłacono, kwotę, imię i nazwisko kierowcy. Jeśli wypłacacie gotówkę z karty firmy, to również należy wskazać (albo zostawiacie ją sobie i odejmujemy ją od diety, albo zwracacie razem ze wszystkimi dokumentami).", "Na każdy wydatek musi być dokument: paragon, faktura lub oświadczenie, z aktualną datą, krajem, kwotą, litrami. Wszystkie paragony muszą być wpisane do Trimble. Paragony najlepiej spiąć i włożyć razem z kartą do osobnej koszulki, CMR-ki — do osobnej koszulki."]
+};
+const INSTR_TITLE = {ru:"ДОРОЖНАЯ КАРТА. ИНСТРУКЦИЯ ПО ВЫПОЛНЕНИЮ.",ua:"ДОРОЖНЯ КАРТА. ІНСТРУКЦІЯ ІЗ ЗАПОВНЕННЯ.",pl:"KARTA DROGOWA. INSTRUKCJA WYPEŁNIANIA."};
+function instr(){ return INSTR_L[lang()] || INSTR_L.ru; }
 function renderInfo(){
   $("#pane-info").innerHTML = `<div class="card"><h3>Дорожная карта. Инструкция по выполнению</h3>
-    <ul class="instr">${INSTR.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
+    <ul class="instr">${instr().map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
     <p class="hint">Эта страница всегда печатается 4-й — как в оригинальном комплекте.</p></div>
 
   <div class="card"><h3>Резервные копии</h3>
@@ -770,11 +819,11 @@ function paintEmpty(){
 }
 function applyHl(){
   document.body.classList.toggle("hl", DB.hlEmpty !== false);
-  const b = $("#btnEmpty"); if(b) b.textContent = (DB.hlEmpty !== false) ? "Пустые ✓" : "Пустые";
+  const b = $("#btnEmpty"); if(b) b.textContent = T((DB.hlEmpty !== false) ? "Пустые ✓" : "Пустые");
   if(DB.hlEmpty === false) document.querySelectorAll(".empty").forEach(e=>e.classList.remove("empty"));
   else paintEmpty();
 }
-function renderAll(){ renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderInfo(); renderCards(); fillBackupInfo(); paintRows(); applyHl(); }
+function renderAll(){ renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderInfo(); renderCards(); fillBackupInfo(); paintRows(); applyHl(); applyLang(); }
 
 async function fillBackupInfo(){
   const st = $("#bkState"); const list = $("#snapList");
@@ -791,10 +840,11 @@ async function fillBackupInfo(){
     return `<div class="item"><div class="ihead"><b>${when}</b>
       <button class="mini" style="margin-left:auto" data-snap="${i}">Восстановить</button></div></div>`;
   }).join("");
+  translateTree(list); translateTree(st.parentElement || st);
 }
 
 async function restoreSnap(i){
-  if(!confirm("Восстановить состояние из копии? Текущие карты будут заменены.")) return;
+  if(!confirm(T("Восстановить состояние из копии? Текущие карты будут заменены."))) return;
   try{
     const raw = await Store.get(SNAP); const box = JSON.parse(raw);
     const item = box.items[i]; if(!item) return;
@@ -948,8 +998,8 @@ function sigBlock(extraStyle){
 
 function printPage4(){
   return `<div class="sheet rus">
-    <div class="h1" style="font-family:Arial,Helvetica,sans-serif;font-size:11pt">ДОРОЖНАЯ КАРТА. ИНСТРУКЦИЯ ПО ВЫПОЛНЕНИЮ.</div>
-    <ul>${INSTR.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
+    <div class="h1" style="font-family:Arial,Helvetica,sans-serif;font-size:11pt">${esc(INSTR_TITLE[lang()] || INSTR_TITLE.ru)}</div>
+    <ul>${instr().map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
     ${sigBlock("font-family:Arial,Helvetica,sans-serif")}
   </div>`;
 }
@@ -1080,7 +1130,7 @@ document.addEventListener("input", e=>{
 document.addEventListener("change", e=>{
   const el = e.target.closest("[data-p]"); if(!el) return;
   if(el.dataset.card && el.value === "__new"){
-    const name = (prompt("Название карты (можно с 4 последними цифрами):")||"").trim();
+    const name = (prompt(T("Название карты (можно с 4 последними цифрами):"))||"").trim();
     if(!name){ el.value = getP(C, el.dataset.p)||""; return; }
     addMyCard(el.dataset.card, name);
     setP(C, el.dataset.p, name); save(true);
@@ -1156,14 +1206,14 @@ document.addEventListener("click", async e=>{
 
   if(t.dataset.mycardAdd){
     const kind = t.dataset.mycardAdd;
-    const name = (prompt("Название карты (можно с 4 последними цифрами):")||"").trim();
+    const name = (prompt(T("Название карты (можно с 4 последними цифрами):"))||"").trim();
     if(!name) return;
     addMyCard(kind, name); save(true); renderKoszty(); paintRows(); toast("Добавлено"); return;
   }
   if(t.dataset.mycardDel){
     const [kind,i] = t.dataset.mycardDel.split("|");
     const l = myCards(kind); const nm = l[+i];
-    if(!confirm(`Убрать «${nm}» из списка? В уже заполненных строках она останется.`)) return;
+    if(!confirm(T(`Убрать «${nm}» из списка? В уже заполненных строках она останется.`))) return;
     DB.mycards[kind].splice(+i,1); save(true); renderKoszty(); paintRows(); return;
   }
 
@@ -1188,7 +1238,7 @@ document.addEventListener("click", async e=>{
 
   if(t.dataset.del){
     const [list,i] = t.dataset.del.split("|");
-    if(!confirm("Удалить запись?")) return;
+    if(!confirm(T("Удалить запись?"))) return;
     C[list].splice(+i,1); save();
     if(list==="trasa") renderTrasa(); else if(list.startsWith("tank")) renderTank(); else renderKoszty();
     paintRows();
@@ -1197,11 +1247,11 @@ document.addEventListener("click", async e=>{
 
   switch(t.id){
     case "btnPrint": buildPrint(); setTimeout(()=>window.print(),120); break;
-    case "btnNew": { const n = prompt("Название новой карты:", "Karta " + new Date().toLocaleDateString("ru-RU"));
+    case "btnNew": { const n = prompt(T("Название новой карты:"), "Karta " + new Date().toLocaleDateString("ru-RU"));
       if(n===null) return; const c = newCard(n.trim()); DB.cards.push(c); DB.active=c.id; C=c; save(true); renderAll(); toast("Карта создана"); break; }
-    case "btnRename": { const n = prompt("Название карты:", C.name); if(n===null) return; C.name=n.trim()||C.name; save(true); renderCards(); break; }
+    case "btnRename": { const n = prompt(T("Название карты:"), C.name); if(n===null) return; C.name=n.trim()||C.name; save(true); renderCards(); break; }
     case "btnDel": { if(DB.cards.length<2){ toast("Это единственная карта"); return; }
-      if(!confirm(`Удалить «${C.name}»? Данные пропадут.`)) return;
+      if(!confirm(T(`Удалить «${C.name}»? Данные пропадут.`))) return;
       DB.cards = DB.cards.filter(c=>c.id!==C.id); C = DB.cards[0]; DB.active=C.id; save(true); renderAll(); break; }
     case "btnEmpty": DB.hlEmpty = (DB.hlEmpty === false); save(true); applyHl();
       toast(DB.hlEmpty === false ? "Подсветка выключена" : "Пустые графы подсвечены"); break;
@@ -1209,6 +1259,10 @@ document.addEventListener("click", async e=>{
     case "btnShare": shareBackup(); break;
     case "btnImport": $("#fileIn").click(); break;
   }
+});
+
+$("#langSel").addEventListener("change", e=>{
+  DB.lang = e.target.value; save(true); renderAll(); window.scrollTo({top:0});
 });
 
 $("#cardSel").addEventListener("change", e=>{
@@ -1266,7 +1320,7 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   // добить недостающие поля после обновлений
   const base = newCard(); for(const k in base){ if(C[k]===undefined) C[k]=base[k]; }
   renderAll();
-  $("#saveState").textContent = "готово";
+  $("#saveState").textContent = T("готово");
   maybeAutoBackup();
 })();
 </script>
