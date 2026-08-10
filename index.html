@@ -129,8 +129,6 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
 
 /* ================= PRINT SHEET (точная копия бланка) ================= */
 #print{position:absolute;left:-99999px;top:0;width:680px;background:#fff;color:#000}
-body.preview #print{position:static;left:auto;padding:10px 0}
-body.preview main,body.preview nav,body.preview header{display:none}
 .page{width:680px;height:880px;overflow:hidden;background:#fff;margin:0 auto 10px}
 .sheet{
   width:680px;min-height:880px;background:#fff;
@@ -186,10 +184,9 @@ select.cur{flex:0 0 108px;padding-left:8px;padding-right:8px;font-size:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v19</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v20</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
-    <button class="btn" id="btnPreview">Предпросмотр</button>
     <select id="cardSel" style="width:auto;min-width:150px;padding:9px 30px 9px 10px;font-size:14px"></select>
     <button class="btn" id="btnNew">Новая карта</button>
     <button class="btn ghost" id="btnRename">Переименовать</button>
@@ -1189,11 +1186,6 @@ document.addEventListener("click", async e=>{
 
   switch(t.id){
     case "btnPrint": buildPrint(); setTimeout(()=>window.print(),120); break;
-    case "btnPreview": buildPrint(); document.body.classList.toggle("preview");
-      if(document.body.classList.contains("preview")){
-        $("#print").style.zoom = Math.min(1, (window.innerWidth-12)/BOX_W);
-        t.textContent="Закрыть просмотр"; window.scrollTo({top:0});
-      } else { $("#print").style.zoom = ""; t.textContent="Предпросмотр"; } break;
     case "btnNew": { const n = prompt("Название новой карты:", "Karta " + new Date().toLocaleDateString("ru-RU"));
       if(n===null) return; const c = newCard(n.trim()); DB.cards.push(c); DB.active=c.id; C=c; save(true); renderAll(); toast("Карта создана"); break; }
     case "btnRename": { const n = prompt("Название карты:", C.name); if(n===null) return; C.name=n.trim()||C.name; save(true); renderCards(); break; }
