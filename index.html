@@ -251,7 +251,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v31</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v32</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1355,7 +1355,24 @@ function buildItogiPrint(){
   }
 }
 
-function renderAll(){ renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderItogi(); renderInfo(); renderCards(); fillBackupInfo(); paintRows(); applyHl(); applyLang(); }
+function renderAll(){
+  LANG_HOLD = true;
+  renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderItogi(); renderInfo();
+  renderCards(); fillBackupInfo(); paintRows(); applyHl();
+  LANG_HOLD = false;
+  applyLang();
+}
+/* Перерисовка одной вкладки (добавили строку, свернули, удалили) собирает её
+   заново по-русски — поэтому язык применяем после каждой такой перерисовки. */
+let LANG_HOLD = false;
+(function(){
+  ["renderMain","renderTrasa","renderTank","renderKoszty","renderInfo","renderItogi","renderMyCards","renderCards"].forEach(function(n){
+    const f = window[n];
+    if(typeof f !== "function") return;
+    window[n] = function(){ const r = f.apply(this, arguments); if(!LANG_HOLD) applyLang(); return r; };
+  });
+})();
+
 
 async function fillBackupInfo(){
   const st = $("#bkState"); const list = $("#snapList");
