@@ -447,7 +447,7 @@ function translateTree(root){
   const arr = []; while(w.nextNode()) arr.push(w.currentNode);
   arr.forEach(function(n){
     const p = n.parentElement; if(!p) return;
-    if(p.closest("#langSel,#cardSel,#print,select[data-card]")) return;
+    if(p.closest("#langSel,#cardSel,#print,#pane-itogi,select[data-card]")) return;
     const v = n.nodeValue; if(!/\S/.test(v)) return;
     const m = v.match(/^(\s*)([\s\S]*?)(\s*)$/);
     const t = T(m[2]);
@@ -950,6 +950,13 @@ const NORM_EMPTY = 12.6;
 const FUEL_LO = 25, FUEL_HI = 33, FUEL_MIN = 18, FUEL_MAX = 40;
 const NIGHT_FROM = 22, NIGHT_TO = 5;
 
+let LG = null;                         /* временный язык для листа в офис */
+function LX(ru, ua, pl){ const L = LG || lang(); return L === "pl" ? pl : (L === "ua" ? ua : ru); }
+/* в графе Kraj часть кодов набрана кириллицей — «СН», «А» выглядят как латинские */
+const CYR2LAT = {"А":"A","В":"B","С":"C","Е":"E","Н":"H","К":"K","М":"M","О":"O","Р":"P","Т":"T","У":"Y","Х":"X","І":"I","Ј":"J","Ѕ":"S","Д":"D","Ф":"F","Г":"G","Л":"L","И":"N","Б":"B"};
+function krajCode(v){
+  return String(v == null ? "" : v).trim().toUpperCase().split("").map(function(ch){ return CYR2LAT[ch] || ch; }).join("");
+}
 function nnum(v){
   const s = String(v == null ? "" : v).replace(/\s/g, "").replace(",", ".");
   if(!s || !/^-?\d+(\.\d+)?$/.test(s)) return null;
@@ -1013,7 +1020,7 @@ function itogi(){
     if(zl != null) seq.push({v:zl, i:i + 1, what:"загрузка"});
     if(wl != null){ seq.push({v:wl, i:i + 1, what:"выгрузка"}); prevW = wl; }
     [r.zk, r.wk].forEach(function(k){
-      const s = String(k || "").trim().toUpperCase();
+      const s = krajCode(k);
       if(s) cmap[s] = (cmap[s] || 0) + 1;
     });
     const w = nnum(r.waga);
@@ -1089,30 +1096,30 @@ function itogi(){
   /* --- проверки --- */
   for(let i = 1; i < seq.length; i++){
     const step = seq[i].v - seq[i - 1].v;
-    if(step < 0) o.flags.push({t:"bad", h:"Счётчик идёт назад: строка " + seq[i].i,
+    if(step < 0) o.flags.push({t:"bad", h:LX("Счётчик идёт назад: строка ", "Лічильник іде назад: рядок ", "Licznik cofa się: wiersz ") + seq[i].i,
                                d:seq[i - 1].v + " → " + seq[i].v});
-    else if(step > 2500) o.flags.push({t:"bad", h:"Скачок счётчика: строка " + seq[i].i,
-                                       d:seq[i - 1].v + " → " + seq[i].v + " (+" + Math.round(step) + " км)"});
+    else if(step > 2500) o.flags.push({t:"bad", h:LX("Скачок счётчика: строка ", "Стрибок лічильника: рядок ", "Skok licznika: wiersz ") + seq[i].i,
+                                       d:seq[i - 1].v + " → " + seq[i].v + " (+" + Math.round(step) + " " + LX("км","км","km") + ")"});
   }
   if(kmP != null && kmK != null && o.loaded + o.empty > 0){
     const diff = Math.abs((kmK - kmP) - (o.loaded + o.empty));
-    if(diff > 60) o.flags.push({t:"bad", h:"Километры не сходятся",
-                                d:"по строкам " + (o.loaded + o.empty) + " км, по счётчику " + Math.round(kmK - kmP) + " км"});
+    if(diff > 60) o.flags.push({t:"bad", h:LX("Километры не сходятся","Кілометри не сходяться","Kilometry się nie zgadzają"),
+                                d:LX("по строкам ","за рядками ","wg wierszy ") + (o.loaded + o.empty) + LX(" км, по счётчику "," км, за лічильником "," km, wg licznika ") + Math.round(kmK - kmP) + " " + LX("км","км","km")});
   }
   const nk = [];
   if(kmK == null) nk.push("Stan licznika KM");
   if(palK == null) nk.push("Stan Paliwa");
   if(nnum(C.stany.kompK) == null) nk.push("Zużycie z komputera");
   if(nnum(C.stany.adbK) == null) nk.push("Ad-Blue");
-  if(nk.length) o.flags.push({t:"warn", h:"Не закрыты конечные показания", d:nk.join(" · ")});
+  if(nk.length) o.flags.push({t:"warn", h:LX("Не закрыты конечные показания","Не закриті кінцеві показання","Brak stanów końcowych"), d:nk.join(" · ")});
   TN.forEach(function(r, i){
     if(String(r.paragon) === "nie")
-      o.flags.push({t:"warn", h:"Нет чека: заправка " + (i + 1),
-                    d:(fmtD(r.d, true) || "") + " · " + litSum(r.litry).total + " л"});
+      o.flags.push({t:"warn", h:LX("Нет чека: заправка ","Немає чека: заправка ","Brak paragonu: tankowanie ") + (i + 1),
+                    d:(fmtD(r.d, true) || "") + " · " + litSum(r.litry).total + " " + LX("л","л","l")});
   });
   const notFull = TN.filter(function(r){ return String(r.pelna) === "nie"; }).length;
   if(notFull && o.fuelSrc === "отрезки")
-    o.flags.push({t:"warn", h:"Не все заправки do pełna", d:"расход по отрезкам считается приблизительно"});
+    o.flags.push({t:"warn", h:LX("Не все заправки do pełna","Не всі заправки do pełna","Nie wszystkie tankowania do pełna"), d:LX("расход по отрезкам считается приблизительно","витрата по відрізках рахується приблизно","spalanie na odcinkach liczone przybliżenie")});
   return o;
 }
 
@@ -1156,94 +1163,138 @@ function barSvg(val, max){
          '<rect class="sc-bg" x="0" y="0" width="' + W + '" height="' + H + '"/>' +
          '<rect class="bar-a" x="0" y="0" width="' + w.toFixed(1) + '" height="' + H + '"/></svg>';
 }
-const KRAJ_RU = {DE:"Германия", FR:"Франция", BE:"Бельгия", NL:"Нидерланды", IT:"Италия", CH:"Швейцария",
-  AT:"Австрия", A:"Австрия", D:"Германия", F:"Франция", B:"Бельгия", I:"Италия", E:"Испания", PL:"Польша", CZ:"Чехия", SK:"Словакия", ES:"Испания", DK:"Дания", SE:"Швеция",
-  NO:"Норвегия", HU:"Венгрия", SI:"Словения", LT:"Литва", LV:"Латвия", EE:"Эстония", RO:"Румыния",
-  HR:"Хорватия", LU:"Люксембург", GB:"Британия", PT:"Португалия", FI:"Финляндия", IE:"Ирландия", GR:"Греция"};
-function n1(v){ return String(Math.round(v * 10) / 10).replace(".", ","); }
+const KRAJ = {
+  DE:["Германия","Німеччина","Niemcy"], FR:["Франция","Франція","Francja"], BE:["Бельгия","Бельгія","Belgia"],
+  NL:["Нидерланды","Нідерланди","Holandia"], IT:["Италия","Італія","Włochy"], CH:["Швейцария","Швейцарія","Szwajcaria"],
+  AT:["Австрия","Австрія","Austria"], A:["Австрия","Австрія","Austria"], D:["Германия","Німеччина","Niemcy"],
+  F:["Франция","Франція","Francja"], B:["Бельгия","Бельгія","Belgia"], I:["Италия","Італія","Włochy"],
+  PL:["Польша","Польща","Polska"], CZ:["Чехия","Чехія","Czechy"], SK:["Словакия","Словаччина","Słowacja"],
+  ES:["Испания","Іспанія","Hiszpania"], E:["Испания","Іспанія","Hiszpania"], DK:["Дания","Данія","Dania"],
+  SE:["Швеция","Швеція","Szwecja"], S:["Швеция","Швеція","Szwecja"], NO:["Норвегия","Норвегія","Norwegia"],
+  N:["Норвегия","Норвегія","Norwegia"], HU:["Венгрия","Угорщина","Węgry"], H:["Венгрия","Угорщина","Węgry"],
+  SI:["Словения","Словенія","Słowenia"], LT:["Литва","Литва","Litwa"], LV:["Латвия","Латвія","Łotwa"],
+  EE:["Эстония","Естонія","Estonia"], RO:["Румыния","Румунія","Rumunia"], HR:["Хорватия","Хорватія","Chorwacja"],
+  LU:["Люксембург","Люксембург","Luksemburg"], L:["Люксембург","Люксембург","Luksemburg"],
+  GB:["Британия","Британія","Wielka Brytania"], PT:["Португалия","Португалія","Portugalia"],
+  P:["Португалия","Португалія","Portugalia"], FI:["Финляндия","Фінляндія","Finlandia"],
+  IE:["Ирландия","Ірландія","Irlandia"], GR:["Греция","Греція","Grecja"], BG:["Болгария","Болгарія","Bułgaria"]
+};
+function krajName(k){
+  const a = KRAJ[k];
+  if(!a) return k;
+  const L = LG || lang();
+  return L === "pl" ? a[2] : (L === "ua" ? a[1] : a[0]);
+}
+
+function n1(v){ return (Math.round(v * 10) / 10).toFixed(1).replace(".", ","); }
 function nkm(v){ return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
 
 function renderItogi(){
   const o = itogi();
   if(!o.orders && !o.litres){
-    $("#pane-itogi").innerHTML = '<div class="card"><h3>Итоги месяца</h3>' +
-      '<p class="hint">Пока нечего считать. Заполните Trasa и заправки — итоги соберутся сами.</p></div>';
+    $("#pane-itogi").innerHTML = '<div class="card"><h3>' + LX("Итоги месяца","Підсумки місяця","Podsumowanie miesiąca") + '</h3><p class="hint">' +
+      LX("Пока нечего считать. Заполните Trasa и заправки — итоги соберутся сами.",
+         "Поки нема чого рахувати. Заповніть Trasa і заправки — підсумки зберуться самі.",
+         "Na razie nie ma czego liczyć. Wypełnij Trasę i tankowania — podsumowanie zbierze się samo.") + '</p></div>';
     return;
   }
-  const nightBlock = '<div class="card"><h3>Ночная работа · окно 22:00–05:00</h3>' +
+  const H = LX("ч","год","h"), KM = LX("км","км","km"), TT = LX("т","т","t"), LT = LX("л","л","l");
+  const OF = LX("из","з","z");
+  const btn = '<button class="btn primary" id="btnItogiPrint" style="width:100%;margin:10px 0 0">' +
+    LX("Лист для офиса","Аркуш для офісу","Arkusz dla biura") + '</button>';
+
+  const night = '<div class="card"><h3>' + LX("Ночная работа","Нічна робота","Praca nocna") + ' · ' +
+      LX("окно","вікно","okno") + ' 22:00–05:00</h3>' +
     '<div class="sum-grid">' +
-      '<div class="sum-cell"><span>Всего</span><b>' + o.nightTotal + ' ч</b></div>' +
-      '<div class="sum-cell"><span>Ночей задействовано</span><b>' + o.nightCount + ' <i style="font-style:normal;font-size:13px;color:var(--dim)">из ' + o.days.length + '</i></b></div>' +
-      '<div class="sum-cell"><span>Средняя рабочая ночь</span><b>' + n1(o.nightAvg) + ' ч</b></div>' +
-      '<div class="sum-cell"><span>Полных ночей</span><b>' + o.nightFull + '</b></div>' +
+      '<div class="sum-cell"><span>' + LX("Всего","Разом","Łącznie") + '</span><b>' + o.nightTotal + ' ' + H + '</b></div>' +
+      '<div class="sum-cell"><span>' + LX("Ночей задействовано","Ночей задіяно","Nocy z pracą") + '</span><b>' + o.nightCount +
+        ' <i style="font-style:normal;font-size:13px;color:var(--dim)">' + OF + ' ' + o.days.length + '</i></b></div>' +
+      '<div class="sum-cell"><span>' + LX("Средняя рабочая ночь","Середня робоча ніч","Średnia noc") + '</span><b>' + n1(o.nightAvg) + ' ' + H + '</b></div>' +
+      '<div class="sum-cell"><span>' + LX("Полных ночей","Повних ночей","Pełnych nocy") + '</span><b>' + o.nightFull + '</b></div>' +
     '</div>' +
     '<div style="margin-top:12px">' + nightSvg(o) + '</div>' +
-    '<div class="sum-note" style="display:flex;justify-content:space-between;margin-top:3px">' +
-      '<span>' + (o.days.length ? dshort(o.days[0].k) : "") + '</span>' +
-      '<span>' + (o.days.length ? dshort(o.days[o.days.length - 1].k) : "") + '</span></div>' +
-    (o.streak >= 3 ? '<div class="sum-flag bad"><b>Серия: ' + o.streak + ' ночей подряд</b>' +
-      dshort(o.streakFrom) + ' — ' + dshort(o.streakTo) + '</div>' : "") +
-    '<p class="hint">Считается по времени погрузок и выгрузок из карты — цифра ориентировочная, тахограф она не заменяет.</p></div>';
+    '<div class="sum-note" style="display:flex;justify-content:space-between;margin-top:3px"><span>' +
+      (o.days.length ? dshort(o.days[0].k) : "") + '</span><span>' +
+      (o.days.length ? dshort(o.days[o.days.length - 1].k) : "") + '</span></div>' +
+    (o.streak >= 3 ? '<div class="sum-flag bad"><b>' +
+      LX("Серия: " + o.streak + " ночей подряд", "Серія: " + o.streak + " ночей поспіль", "Seria: " + o.streak + " nocy pod rząd") +
+      '</b>' + dshort(o.streakFrom) + ' — ' + dshort(o.streakTo) + '</div>' : "") +
+    '<p class="hint">' + LX("Считается по времени погрузок и выгрузок из карты — цифра ориентировочная, тахограф она не заменяет.",
+        "Рахується за часом завантажень і вивантажень з карти — цифра орієнтовна, тахограф вона не замінює.",
+        "Liczone na podstawie czasów załadunku i rozładunku z karty — wartość orientacyjna, nie zastępuje tachografu.") + '</p></div>';
 
-  const fuelBlock = '<div class="card"><h3>Расход ON</h3>' +
+  const fuel = '<div class="card"><h3>' + LX("Расход ON","Витрата ON","Spalanie ON") + '</h3>' +
     (o.fuel != null
-      ? '<div class="sum-big">' + n1(o.fuel) + ' <span style="font-size:13px;color:var(--dim);font-weight:400">л / 100 км</span></div>' +
-        '<div class="sum-note" style="margin:2px 0 10px">залито ' + n1(o.litres) + ' л · ' + nkm(o.km) + ' км</div>' +
+      ? '<div class="sum-big">' + n1(o.fuel) + ' <span style="font-size:13px;color:var(--dim);font-weight:400">' + LT + ' / 100 ' + KM + '</span></div>' +
+        '<div class="sum-note" style="margin:2px 0 10px">' + LX("залито","залито","zatankowano") + ' ' + n1(o.litres) + ' ' + LT + ' · ' + nkm(o.km) + ' ' + KM + '</div>' +
         scaleSvg(o.fuel, FUEL_MIN, FUEL_MAX, null, [FUEL_LO, FUEL_HI]) +
-        '<div class="sum-note" style="display:flex;justify-content:space-between;margin-top:3px">' +
-          '<span>' + FUEL_MIN + '</span><span>типовой ' + FUEL_LO + '–' + FUEL_HI + '</span><span>' + FUEL_MAX + '</span></div>'
-      : '<p class="hint">Расход посчитается, когда будет хотя бы две заправки do pełna с показаниями счётчика.</p>') +
+        '<div class="sum-note" style="display:flex;justify-content:space-between;margin-top:3px"><span>' + FUEL_MIN + '</span><span>' +
+          LX("типовой","типовий","typowy") + ' ' + FUEL_LO + '–' + FUEL_HI + '</span><span>' + FUEL_MAX + '</span></div>'
+      : '<p class="hint">' + LX("Расход посчитается, когда будет хотя бы две заправки do pełna с показаниями счётчика.",
+          "Витрата порахується, коли буде щонайменше дві заправки do pełna з показаннями лічильника.",
+          "Spalanie policzy się, gdy będą co najmniej dwa tankowania do pełna ze stanem licznika.") + '</p>') +
     (o.segs.length ? '<div style="margin-top:12px">' + o.segs.map(function(s){
-        return '<div class="sum-row"><i>' + (fmtD(s.a, true) || "") + ' → ' + (fmtD(s.b, true) || "") + '</i>' +
-               '<span>' + n1(s.l100) + '</span></div>'; }).join("") + '</div>' : "") +
-    (o.spread != null ? '<div class="sum-note" style="margin-top:8px">Разброс по отрезкам ' + n1(o.spread) + ' л</div>' : "") +
+        return '<div class="sum-row"><i>' + (fmtD(s.a, true) || "") + ' → ' + (fmtD(s.b, true) || "") + '</i><span>' + n1(s.l100) + '</span></div>';
+      }).join("") + '</div>' : "") +
+    (o.spread != null ? '<div class="sum-note" style="margin-top:8px">' +
+      LX("Разброс по отрезкам","Розкид по відрізках","Rozrzut na odcinkach") + ' ' + n1(o.spread) + ' ' + LT + '</div>' : "") +
     '</div>';
 
-  const volBlock = '<div class="card"><h3>Объём работы</h3>' +
+  const vol = '<div class="card"><h3>' + LX("Объём работы","Обсяг роботи","Praca") + '</h3>' +
     '<div class="sum-grid">' +
-      '<div class="sum-cell"><span>Пробег</span><b>' + nkm(o.km) + '</b></div>' +
-      '<div class="sum-cell"><span>Заказов</span><b>' + o.orders + (o.pca ? ' <i style="font-style:normal;font-size:13px;color:var(--dim)">PCA ' + o.pca + '</i>' : "") + '</b></div>' +
+      '<div class="sum-cell"><span>' + LX("Пробег","Пробіг","Przebieg") + '</span><b>' + nkm(o.km) + '</b></div>' +
+      '<div class="sum-cell"><span>' + LX("Заказов","Замовлень","Zlecenia") + '</span><b>' + o.orders +
+        (o.pca ? ' <i style="font-style:normal;font-size:13px;color:var(--dim)">PCA ' + o.pca + '</i>' : "") + '</b></div>' +
     '</div>' +
     (o.emptyPct != null
-      ? '<div style="margin-top:12px"><div class="sum-note" style="margin-bottom:5px">Порожний пробег <b style="color:var(--ink)">' +
-        n1(o.emptyPct) + ' %</b> · ' + nkm(o.empty) + ' км · норма ЕС ' + String(NORM_EMPTY).replace(".", ",") + ' %</div>' +
+      ? '<div style="margin-top:12px"><div class="sum-note" style="margin-bottom:5px">' +
+        LX("Порожний пробег","Порожній пробіг","Puste przebiegi") + ' <b style="color:var(--ink)">' + n1(o.emptyPct) + ' %</b> · ' +
+        nkm(o.empty) + ' ' + KM + ' · ' + LX("норма ЕС","норма ЄС","średnia UE") + ' ' + String(NORM_EMPTY).replace(".", ",") + ' %</div>' +
         scaleSvg(o.emptyPct, 0, 30, NORM_EMPTY, null) +
-        '<div class="sum-note" style="display:flex;justify-content:space-between;margin-top:3px"><span>0 %</span><span>норма ЕС</span><span>30 %</span></div></div>'
+        '<div class="sum-note" style="display:flex;justify-content:space-between;margin-top:3px"><span>0 %</span><span>' +
+          LX("норма ЕС","норма ЄС","średnia UE") + '</span><span>30 %</span></div></div>'
       : "") +
     '<div style="margin-top:12px">' +
-      (o.weighed ? '<div class="sum-row"><i>Вес всего</i><span>' + n1(o.weight / 1000) + ' т</span></div>' : "") +
-      (o.odo != null ? '<div class="sum-row"><i>Пробег машины</i><span>' + nkm(o.odo) + ' км</span></div>' : "") +
+      (o.weighed ? '<div class="sum-row"><i>' + LX("Вес всего","Вага разом","Waga łącznie") + '</i><span>' + n1(o.weight / 1000) + ' ' + TT + '</span></div>' : "") +
+      (o.odo != null ? '<div class="sum-row"><i>' + LX("Пробег машины","Пробіг машини","Stan licznika") + '</i><span>' + nkm(o.odo) + ' ' + KM + '</span></div>' : "") +
     '</div>' +
     (o.countries.length ? '<div style="margin-top:10px">' + o.countries.map(function(c){
-        return '<div class="sum-row"><i>' + (KRAJ_RU[c.k] || c.k) + '</i><span>' + c.n + '</span></div>'; }).join("") + '</div>' : "") +
-    '<p class="hint">Норма порожнего пробега — Eurostat road_go_ta_tott, 2024: в международных перевозках ЕС 12,6 %.</p></div>';
+        return '<div class="sum-row"><i>' + esc(krajName(c.k)) + '</i><span>' + c.n + '</span></div>'; }).join("") + '</div>' : "") +
+    '<p class="hint">' + LX("Норма порожнего пробега — Eurostat road_go_ta_tott, 2024: в международных перевозках ЕС 12,6 %.",
+        "Норма порожнього пробігу — Eurostat road_go_ta_tott, 2024: у міжнародних перевезеннях ЄС 12,6 %.",
+        "Norma pustych przebiegów — Eurostat road_go_ta_tott, 2024: w transporcie międzynarodowym UE 12,6 %.") + '</p></div>';
 
-  const flagBlock = '<div class="card"><h3>Проверка карты</h3>' +
+  const flags = '<div class="card"><h3>' + LX("Проверка карты","Перевірка карти","Kontrola karty") + '</h3>' +
     (o.flags.length
       ? o.flags.map(function(f){ return '<div class="sum-flag ' + f.t + '"><b>' + esc(f.h) + '</b>' + esc(f.d) + '</div>'; }).join("")
-      : '<div class="sum-flag ok"><b>Замечаний нет</b>Счётчик сходится, показания закрыты, чеки на месте.</div>') +
-    '</div>';
+      : '<div class="sum-flag ok"><b>' + LX("Замечаний нет","Зауважень немає","Bez uwag") + '</b>' +
+        LX("Счётчик сходится, показания закрыты, чеки на месте.",
+           "Лічильник сходиться, показання закриті, чеки на місці.",
+           "Licznik zgodny, stany końcowe uzupełnione, paragony na miejscu.") + '</div>') + '</div>';
 
   const lvl = loadLevel(o);
-  const endBlock = '<div class="card"><h3>Нагрузка месяца</h3>' +
-    '<div class="sum-big">' + lvl + '</div>' +
-    '<p class="sum-note" style="margin:6px 0 0">Пробег ' + nkm(o.km) + ' км · заказов ' + o.orders +
-      ' · ночная работа ' + o.nightTotal + ' ч' + (o.streak >= 3 ? ', серия ' + o.streak + ' ночей подряд' : "") + '.</p>' +
-    '<button class="add" id="btnItogiPrint" style="margin-top:12px">Лист для офиса</button></div>';
+  const end = '<div class="card"><h3>' + LX("Нагрузка месяца","Навантаження місяця","Obciążenie miesiąca") + '</h3>' +
+    '<div class="sum-big">' + esc(LVL_TXT(lvl)) + '</div>' +
+    '<p class="sum-note" style="margin:6px 0 0">' + LX("Пробег","Пробіг","Przebieg") + ' ' + nkm(o.km) + ' ' + KM + ' · ' +
+      LX("заказов","замовлень","zlecenia") + ' ' + o.orders + ' · ' + LX("ночная работа","нічна робота","praca nocna") + ' ' +
+      o.nightTotal + ' ' + H + '.</p></div>';
 
-  $("#pane-itogi").innerHTML = nightBlock + fuelBlock + volBlock + flagBlock + endBlock;
+  $("#pane-itogi").innerHTML = btn + night + fuel + vol + flags + end + btn.replace('margin:10px 0 0', 'margin:14px 0 0');
 }
 
 /* ================= Лист для офиса (печать, монохром, польский) ================= */
+const LVL = {"Тяжёлый":["Тяжёлый","Важкий","Ciężki"], "Обычный":["Обычный","Звичайний","Typowy"], "Лёгкий":["Лёгкий","Легкий","Lekki"]};
+function LVL_TXT(k){ const a = LVL[k] || [k,k,k]; const L = LG || lang(); return L === "pl" ? a[2] : (L === "ua" ? a[1] : a[0]); }
 const LVL_PL = {"Тяжёлый":"Miesiąc ciężki", "Обычный":"Miesiąc typowy", "Лёгкий":"Miesiąc lekki"};
 function printItogi(){
+  LG = "pl";
   const o = itogi();
   const h = C.head;
   const kier = [h.k1i, h.k1n].filter(Boolean).join(" ");
   const row = function(a, b){ return '<tr><td style="border:none;padding:2px 0">' + a +
     '</td><td style="border:none;padding:2px 0;text-align:right">' + esc(b) + '</td></tr>'; };
   const okres = (o.from && o.to) ? (fmtD(o.from) + " – " + fmtD(o.to)) : "";
-  return '<div class="sheet ito">' +
+  const html = '<div class="sheet ito">' +
     '<div class="itohead"><div><div class="itotitle">Podsumowanie miesiąca</div>' +
       '<div class="itosub">' + esc(C.name || "") + '</div></div>' +
       '<div class="itosub" style="text-align:right">' + esc(h.nrRej || "") + '<br>' + esc(kier) + '</div></div>' +
@@ -1288,11 +1339,20 @@ function printItogi(){
     '<div class="itofoot">Godziny nocne obliczone na podstawie czasów załadunku i rozładunku z karty drogowej — wartość orientacyjna, nie zastępuje danych z tachografu.<br>' +
     'Norma pustych przebiegów: transport międzynarodowy UE ' + String(NORM_EMPTY).replace(".", ",") + ' % (Eurostat 2024, road_go_ta_tott).</div>' +
     sigBlock() + '</div>';
+  LG = null;
+  return html;
 }
 function buildItogiPrint(){
-  $("#print").innerHTML = '<div class="page">' + printItogi() + '</div>';
-  fitPages();
-  fitCells();
+  try{
+    $("#print").innerHTML = '<div class="page">' + printItogi() + '</div>';
+    fitPages();
+    fitCells();
+    return true;
+  }catch(err){
+    LG = null;
+    toast("Не удалось собрать лист");
+    return false;
+  }
 }
 
 function renderAll(){ renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderItogi(); renderInfo(); renderCards(); fillBackupInfo(); paintRows(); applyHl(); applyLang(); }
@@ -1817,7 +1877,7 @@ document.addEventListener("click", async e=>{
 
   switch(t.id){
     case "btnPrint": buildPrint(); setTimeout(()=>window.print(),120); break;
-    case "btnItogiPrint": buildItogiPrint(); setTimeout(()=>window.print(),120); break;
+    case "btnItogiPrint": if(buildItogiPrint()) setTimeout(()=>window.print(),120); break;
     case "btnNew": { const n = prompt(T("Название новой карты:"), "Karta " + new Date().toLocaleDateString("ru-RU"));
       if(n===null) return; const c = newCard(n.trim()); DB.cards.push(c); DB.active=c.id; C=c; save(true); renderAll(); toast("Карта создана"); break; }
     case "btnRename": { const n = prompt(T("Название карты:"), C.name); if(n===null) return; C.name=n.trim()||C.name; save(true); renderCards(); break; }
