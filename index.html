@@ -197,12 +197,61 @@ select.cur{flex:0 0 108px;padding-left:8px;padding-right:8px;font-size:15px}
 .ctrow span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ctrow small{color:var(--dim);min-width:26px;text-align:right}
 .mycard{display:inline-flex;align-items:center;gap:4px;background:var(--line);border-radius:8px;padding:3px 6px;margin:2px 4px 2px 0;font-size:13px}
+
+/* ================= Итоги месяца ================= */
+.sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sum-cell{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:9px 11px}
+.sum-cell span{font-size:11px;color:var(--dim)}
+.sum-cell b{display:block;font-size:21px;font-weight:700;margin-top:2px}
+.sum-big{font-size:26px;font-weight:700;line-height:1.15}
+.sum-note{font-size:12px;color:var(--dim);line-height:1.45}
+.sum-flag{border-radius:12px;padding:9px 11px;font-size:13px;line-height:1.45;margin-top:8px}
+.sum-flag b{display:block;margin-bottom:2px}
+.sum-flag.bad{background:#FBE8E4;border:1px solid #E0A697;color:#7A2A19}
+.sum-flag.warn{background:#FDF3DC;border:1px solid #E0BE72;color:#5A4413}
+.sum-flag.ok{background:#E7F2EA;border:1px solid #9CC4AB;color:#22553A}
+.sum-row{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.sum-row:last-child{border-bottom:none}
+.sum-row i{font-style:normal;color:var(--dim)}
+/* графика — SVG, чтобы печаталась даже без фоновой заливки */
+svg.chart{width:100%;display:block;height:18px}
+svg.nchart{height:70px}
+svg.bchart{height:15px}
+.nb-full{fill:#C6402A}.nb-part{fill:#8A6BC4}.nb-zero{fill:#D3D6DB}
+.ax{fill:#15181C;opacity:.3}
+.sc-bg{fill:#E9E7E1}.sc-band{fill:#DCEBE1}.sc-fill{fill:#2F7D4F}.sc-mark{fill:#15181C}
+.bar-a{fill:#B77400}
+/* ---- тот же экран на печать: только чёрный, серый и линия ---- */
+.sheet .nb-full{fill:#000}
+.sheet .nb-part{fill:#8C8C8C}
+.sheet .nb-zero{fill:#C8C8C8}
+.sheet .ax{fill:#000;opacity:1}
+.sheet .sc-bg{fill:#EDEDED}
+.sheet .sc-band{fill:#D2D2D2}
+.sheet .sc-fill{fill:#000}
+.sheet .sc-mark{fill:#000}
+.sheet svg.nchart{height:52px}
+.ito{font-family:Arial,Helvetica,sans-serif}
+.itohead{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #000;padding-bottom:5px;margin-bottom:9px}
+.itotitle{font-size:13pt;font-weight:bold}
+.itosub{font-size:8.5pt}
+.itoh{font-size:8.5pt;font-weight:bold;border-bottom:1px solid #000;padding-bottom:2px;margin:11px 0 6px}
+.itoboxes td{border:1px solid #000;padding:4px 5px;text-align:center;width:25%}
+.itolab{font-size:7.5pt}
+.itobig{font-size:13pt;font-weight:bold}
+.itoax{display:flex;justify-content:space-between;font-size:7.5pt;margin-top:2px}
+.itonote{font-size:7.5pt;margin-top:3px}
+.itoser{border:1.2px solid #000;font-size:9pt;font-weight:bold;padding:4px 6px;margin-top:6px}
+.itotab td{font-size:9pt}
+.itodoc div{font-size:9pt;line-height:1.5}
+.itolvl{border:1.2px solid #000;font-size:11pt;font-weight:bold;text-align:center;padding:5px;margin-top:11px}
+.itofoot{font-size:7.5pt;line-height:1.4;border-top:1px solid #000;padding-top:5px;margin-top:9px}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v30</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v31</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -228,6 +277,7 @@ select.cur{flex:0 0 108px;padding-left:8px;padding-right:8px;font-size:15px}
   <section class="pane" id="pane-trasa"></section>
   <section class="pane" id="pane-tank"></section>
   <section class="pane" id="pane-koszty"></section>
+  <section class="pane" id="pane-itogi"></section>
   <section class="pane" id="pane-info"></section>
 </main>
 
@@ -342,6 +392,34 @@ const LANGS = [["ru","Беларусь · Русский"],["ua","Україна
 function lang(){ try{ return (DB && DB.lang) || "ru"; }catch(e){ return "ru"; } }
 const I18N = { ua: {"+ Ещё загрузка": "+ Ще завантаження", "+ Ещё выгрузка": "+ Ще вивантаження", "Готово": "Готово", "Править": "Редагувати", "Печать / PDF": "Друк / PDF", "Новая карта": "Нова карта", "Переименовать": "Перейменувати", "Пустые": "Порожні", "Пустые ✓": "Порожні ✓", "Копия ⤴": "Копія ⤴", "Экспорт": "Експорт", "Импорт": "Імпорт", "Удалить": "Видалити", "Очистить": "Очистити", "Восстановить": "Відновити", "Сделать": "Зробити", "Сейчас": "Зараз", "Сег.": "Сьог.", "Сейч.": "Зараз", "Карта": "Карта", "Заправки": "Заправки", "Расходы": "Витрати", "Инструкция": "Інструкція", "Numer Wyjazdu — номер выезда": "Numer Wyjazdu — номер виїзду", "Numer Teczki — номер папки": "Numer Teczki — номер теки", "WYJAZD Z BAZY — начало работы": "WYJAZD Z BAZY — початок роботи", "POWRÓT NA BAZĘ — окончание работы": "POWRÓT NA BAZĘ — кінець роботи", "Bus — выезд с базы": "Bus — виїзд з бази", "Bus — возврат на базу": "Bus — повернення на базу", "Wyjazd Busem z bazy — выезд с базы": "Wyjazd Busem z bazy — виїзд з бази", "Przyjazd Busem do samochodu — приезд к тягачу": "Przyjazd Busem do samochodu — приїзд до тягача", "Powrót Busem do Bazy — выезд к базе": "Powrót Busem do Bazy — виїзд до бази", "Przyjazd Busem do bazy — приезд на базу": "Przyjazd Busem do bazy — приїзд на базу", "Stan licznika KM — километраж": "Stan licznika KM — кілометраж", "Stan Paliwa — топливо, %": "Stan Paliwa — пальне, %", "Załadunek — загрузка": "Załadunek — завантаження", "Wyładunek — выгрузка": "Wyładunek — вивантаження", "Miejscowość (левая колонка)": "Miejscowość (ліва колонка)", "Miejscowość (правая колонка)": "Miejscowość (права колонка)", "Data / Godz. — ПОСЛЕ окончания загрузки": "Data / Godz. — ПІСЛЯ завершення завантаження", "Data / Godz. — ПОСЛЕ окончания выгрузки": "Data / Godz. — ПІСЛЯ завершення вивантаження", "Za co — за что": "Za co — за що", "Podpisy — подписи": "Podpisy — підписи", "Pierwszy kierowca — расписаться пальцем": "Pierwszy kierowca — розписатися пальцем", "Drugi kierowca — расписаться пальцем": "Drugi kierowca — розписатися пальцем", "Примечания на бланк": "Примітки на бланк", "Дорожная карта. Инструкция по выполнению": "Дорожня карта. Інструкція із заповнення", "Резервные копии": "Резервні копії", "Копии внутри устройства": "Копії всередині пристрою", "Сохранить копию сейчас": "Зберегти копію зараз", "Как это работает": "Як це працює", "Итого по картам": "Разом за картками", "Всего": "Разом", "Мои карты": "Мої картки", "Банковские": "Банківські", "Топливные": "Паливні", "+ Добавить строку": "+ Додати рядок", "+ Заправка ON": "+ Заправка ON", "+ Заправка AdBlue": "+ Заправка AdBlue", "+ Заправка холодильника": "+ Заправка холодильника", "+ Покупка": "+ Покупка", "+ Оплата": "+ Оплата", "+ Сервис": "+ Сервіс", "+ Штраф": "+ Штраф", "+ Своя покупка": "+ Своя покупка", "+ чек": "+ чек", "+ добавить": "+ додати", "＋ Своя карта…": "＋ Своя картка…", "готово": "готово", "неполно": "неповно", "пусто": "порожньо", "нет загрузки": "немає завантаження", "нет выгрузки": "немає вивантаження", "подпись сохранена": "підпис збережено", "пока нет": "поки немає", "ни разу": "жодного разу", "без карты": "без картки", "своя карта / наличные": "своя картка / готівка", "т / кг": "т / кг", "сохраняю…": "зберігаю…", "Пусто.": "Порожньо.", "Пока нет.": "Поки немає.", "Пока пусто. Добавьте первую загрузку.": "Поки порожньо. Додайте перше завантаження.", "Копия ещё ни разу не сохранялась.": "Копію ще жодного разу не збережено.", "Последняя копия — сегодня.": "Остання копія — сьогодні.", "Эта страница всегда печатается 4-й — как в оригинальном комплекте.": "Ця сторінка завжди друкується четвертою — як в оригінальному комплекті.", "Раз в сутки приложение само кладёт файл копии в Загрузки. Кнопка «Копия ⤴» вверху отправляет его в облако или мессенджер одним тапом — это единственное, что спасёт данные, если устройство пропадёт.": "Раз на добу застосунок сам кладе файл копії в Завантаження. Кнопка «Копія ⤴» вгорі надсилає його в хмару або месенджер одним дотиком — це єдине, що врятує дані, якщо пристрій зникне.", "Показания переписываем с компьютера в тягаче: перед выездом с базы — Początek, после приезда — Koniec.": "Показники переписуємо з комп'ютера в тягачі: перед виїздом з бази — Początek, після приїзду — Koniec.", "Вписываем ВСЕ загрузки и ВСЕ выгрузки. При перецепке: получая груз — Załadunek, передавая — Wyładunek. Вес переписываем с CMR, при перецепе жмём PCA.": "Вписуємо ВСІ завантаження і ВСІ вивантаження. При перечіпці: отримуючи вантаж — Załadunek, передаючи — Wyładunek. Вагу переписуємо з CMR, при перечіпці тиснемо PCA.", "Заправку холодильника берём отдельным чеком, в Trimble вписываем как «paliwo», на чеке подписываем «chłodnia». Не суммируем — каждый бак отдельной строкой.": "Заправку холодильника беремо окремим чеком, у Trimble вписуємо як «paliwo», на чеку підписуємо «chłodnia». Не сумуємо — кожен бак окремим рядком.", "Только ON тягача — AdBlue и холодильник сюда не идут. Справа — сколько чеков.": "Тільки ON тягача — AdBlue і холодильник сюди не входять. Праворуч — скільки чеків.", "Каждая валюта считается отдельно — ничего не смешивается. Справа — сколько строк.": "Кожна валюта рахується окремо — нічого не змішується. Праворуч — скільки рядків.", "В Польше по карте фирмы (Visa / Mastercard) обязательно берём FAKTURA VAT. Нет чека — пишем oświadczenie.": "У Польщі за карткою фірми (Visa / Mastercard) обов'язково беремо FAKTURA VAT. Немає чека — пишемо oświadczenie.", "Пиши только название и, если нужно, 4 последние цифры — полный номер и PIN в приложение вносить не надо.": "Пиши лише назву і, якщо треба, 4 останні цифри — повний номер і PIN у застосунок вносити не треба.", "Подпись встанет на бланке над линией «Pierwszy kierowca» / «Drugi kierowca». Если оставить пусто — напечатается чистая линия, как в оригинале.": "Підпис стане на бланку над лінією «Pierwszy kierowca» / «Drugi kierowca». Якщо залишити порожнім — надрукується чиста лінія, як в оригіналі.", "Всё сохраняется прямо в телефоне — интернет не нужен. Кнопки «Сег.», «Сейч.» и «Сейчас» подставляют дату и время. Кнопка GPS определяет страну по координатам офлайн, а если есть сеть — подтягивает и город.": "Усе зберігається прямо в телефоні — інтернет не потрібен. Кнопки «Сьог.», «Зараз» підставляють дату й час. Кнопка GPS визначає країну за координатами офлайн, а якщо є мережа — підтягує і місто.", "Печать: «Печать / PDF» → в Safari выбираете принтер или «Сохранить в Файлы» (PDF). Бланк печатается 1-в-1 как оригинал.": "Друк: «Друк / PDF» → у Safari обираєте принтер або «Зберегти у Файли» (PDF). Бланк друкується 1-в-1 як оригінал.", "Чтобы открывалось в один тап: откройте файл в Safari → «Поделиться» → «На экран \"Домой\"».": "Щоб відкривалося одним дотиком: відкрийте файл у Safari → «Поділитися» → «На екран \"Додому\"».", "Карта создана": "Карту створено", "Карта добавлена": "Картку додано", "Карта загружена": "Карту завантажено", "Это единственная карта": "Це єдина карта", "Подсветка выключена": "Підсвічування вимкнено", "Пустые графы подсвечены": "Порожні графи підсвічено", "Копия сохранена в Загрузки": "Копію збережено в Завантаження", "Восстановлено": "Відновлено", "Не удалось восстановить": "Не вдалося відновити", "Файл не читается": "Файл не читається", "Дата и время подставлены": "Дату й час підставлено", "Добавлено": "Додано", "Подпись очищена": "Підпис очищено", "Сначала впиши литры первого чека": "Спочатку впиши літри першого чека", "Геолокация недоступна": "Геолокація недоступна", "Нет доступа к геолокации": "Немає доступу до геолокації", "Страна не определена": "Країну не визначено", "Удалить запись?": "Видалити запис?", "Восстановить состояние из копии? Текущие карты будут заменены.": "Відновити стан з копії? Поточні карти буде замінено.", "Название карты:": "Назва карти:", "Название новой карты:": "Назва нової карти:", "Название карты (можно с 4 последними цифрами):": "Назва картки (можна з 4 останніми цифрами):"}, pl: {"+ Ещё загрузка": "+ Kolejny załadunek", "+ Ещё выгрузка": "+ Kolejny wyładunek", "Готово": "Gotowe", "Править": "Edytuj", "Печать / PDF": "Wydruk / PDF", "Новая карта": "Nowa karta", "Переименовать": "Zmień nazwę", "Пустые": "Puste", "Пустые ✓": "Puste ✓", "Копия ⤴": "Kopia ⤴", "Экспорт": "Eksport", "Импорт": "Import", "Удалить": "Usuń", "Очистить": "Wyczyść", "Восстановить": "Przywróć", "Сделать": "Zrób", "Сейчас": "Teraz", "Сег.": "Dziś", "Сейч.": "Teraz", "Карта": "Karta", "Заправки": "Tankowania", "Расходы": "Koszty", "Инструкция": "Instrukcja", "Numer Wyjazdu — номер выезда": "Numer Wyjazdu", "Numer Teczki — номер папки": "Numer Teczki", "WYJAZD Z BAZY — начало работы": "WYJAZD Z BAZY — początek pracy", "POWRÓT NA BAZĘ — окончание работы": "POWRÓT NA BAZĘ — koniec pracy", "Bus — выезд с базы": "Bus — wyjazd z bazy", "Bus — возврат на базу": "Bus — powrót na bazę", "Wyjazd Busem z bazy — выезд с базы": "Wyjazd Busem z bazy", "Przyjazd Busem do samochodu — приезд к тягачу": "Przyjazd Busem do samochodu", "Powrót Busem do Bazy — выезд к базе": "Powrót Busem do Bazy", "Przyjazd Busem do bazy — приезд на базу": "Przyjazd Busem do bazy", "Stan licznika KM — километраж": "Stan licznika KM", "Stan Paliwa — топливо, %": "Stan Paliwa, %", "Załadunek — загрузка": "Załadunek", "Wyładunek — выгрузка": "Wyładunek", "Miejscowość (левая колонка)": "Miejscowość (lewa kolumna)", "Miejscowość (правая колонка)": "Miejscowość (prawa kolumna)", "Data / Godz. — ПОСЛЕ окончания загрузки": "Data / Godz. — PO zakończeniu załadunku", "Data / Godz. — ПОСЛЕ окончания выгрузки": "Data / Godz. — PO zakończeniu wyładunku", "Za co — за что": "Za co", "Podpisy — подписи": "Podpisy", "Pierwszy kierowca — расписаться пальцем": "Pierwszy kierowca — podpis palcem", "Drugi kierowca — расписаться пальцем": "Drugi kierowca — podpis palcem", "Примечания на бланк": "Uwagi na formularz", "Дорожная карта. Инструкция по выполнению": "Karta drogowa. Instrukcja wypełniania", "Резервные копии": "Kopie zapasowe", "Копии внутри устройства": "Kopie w urządzeniu", "Сохранить копию сейчас": "Zapisz kopię teraz", "Как это работает": "Jak to działa", "Итого по картам": "Razem wg kart", "Всего": "Razem", "Мои карты": "Moje karty", "Банковские": "Bankowe", "Топливные": "Paliwowe", "+ Добавить строку": "+ Dodaj wiersz", "+ Заправка ON": "+ Tankowanie ON", "+ Заправка AdBlue": "+ Tankowanie AdBlue", "+ Заправка холодильника": "+ Tankowanie chłodni", "+ Покупка": "+ Zakup", "+ Оплата": "+ Opłata", "+ Сервис": "+ Serwis", "+ Штраф": "+ Mandat", "+ Своя покупка": "+ Zakup własną kartą", "+ чек": "+ paragon", "+ добавить": "+ dodaj", "＋ Своя карта…": "＋ Własna karta…", "готово": "gotowe", "неполно": "niepełne", "пусто": "pusto", "нет загрузки": "brak załadunku", "нет выгрузки": "brak wyładunku", "подпись сохранена": "podpis zapisany", "пока нет": "jeszcze nie", "ни разу": "ani razu", "без карты": "bez karty", "своя карта / наличные": "własna karta / gotówka", "т / кг": "t / kg", "сохраняю…": "zapisuję…", "Пусто.": "Pusto.", "Пока нет.": "Jeszcze nie ma.", "Пока пусто. Добавьте первую загрузку.": "Na razie pusto. Dodaj pierwszy załadunek.", "Копия ещё ни разу не сохранялась.": "Kopia nie została jeszcze ani razu zapisana.", "Последняя копия — сегодня.": "Ostatnia kopia — dzisiaj.", "Эта страница всегда печатается 4-й — как в оригинальном комплекте.": "Ta strona zawsze drukuje się jako czwarta — jak w oryginalnym komplecie.", "Раз в сутки приложение само кладёт файл копии в Загрузки. Кнопка «Копия ⤴» вверху отправляет его в облако или мессенджер одним тапом — это единственное, что спасёт данные, если устройство пропадёт.": "Raz na dobę aplikacja sama zapisuje plik kopii w Pobranych. Przycisk «Kopia ⤴» u góry wysyła go do chmury lub komunikatora jednym dotknięciem — to jedyne, co uratuje dane, jeśli urządzenie zniknie.", "Показания переписываем с компьютера в тягаче: перед выездом с базы — Początek, после приезда — Koniec.": "Stany przepisujemy z komputera w ciągniku: przed wyjazdem z bazy — Początek, po przyjeździe — Koniec.", "Вписываем ВСЕ загрузки и ВСЕ выгрузки. При перецепке: получая груз — Załadunek, передавая — Wyładunek. Вес переписываем с CMR, при перецепе жмём PCA.": "Wpisujemy WSZYSTKIE załadunki i WSZYSTKIE wyładunki. Przy przeczepce: odbierając ładunek — Załadunek, przekazując — Wyładunek. Wagę przepisujemy z CMR, przy przeczepce naciskamy PCA.", "Заправку холодильника берём отдельным чеком, в Trimble вписываем как «paliwo», на чеке подписываем «chłodnia». Не суммируем — каждый бак отдельной строкой.": "Tankowanie chłodni bierzemy na osobny paragon, w Trimble wpisujemy jako «paliwo», na paragonie podpisujemy «chłodnia». Nie sumujemy — każdy zbiornik osobnym wierszem.", "Только ON тягача — AdBlue и холодильник сюда не идут. Справа — сколько чеков.": "Tylko ON ciągnika — AdBlue i chłodnia tu nie wchodzą. Po prawej — ile paragonów.", "Каждая валюта считается отдельно — ничего не смешивается. Справа — сколько строк.": "Każda waluta liczona jest osobno — nic się nie miesza. Po prawej — ile wierszy.", "В Польше по карте фирмы (Visa / Mastercard) обязательно берём FAKTURA VAT. Нет чека — пишем oświadczenie.": "W Polsce kartą firmową (Visa / Mastercard) obowiązkowo bierzemy FAKTURĘ VAT. Brak paragonu — piszemy oświadczenie.", "Пиши только название и, если нужно, 4 последние цифры — полный номер и PIN в приложение вносить не надо.": "Wpisuj tylko nazwę i w razie potrzeby 4 ostatnie cyfry — pełnego numeru i PIN-u nie wpisujemy do aplikacji.", "Подпись встанет на бланке над линией «Pierwszy kierowca» / «Drugi kierowca». Если оставить пусто — напечатается чистая линия, как в оригинале.": "Podpis stanie na formularzu nad linią «Pierwszy kierowca» / «Drugi kierowca». Jeśli zostawisz puste — wydrukuje się czysta linia, jak w oryginale.", "Всё сохраняется прямо в телефоне — интернет не нужен. Кнопки «Сег.», «Сейч.» и «Сейчас» подставляют дату и время. Кнопка GPS определяет страну по координатам офлайн, а если есть сеть — подтягивает и город.": "Wszystko zapisuje się bezpośrednio w telefonie — internet nie jest potrzebny. Przyciski «Dziś» i «Teraz» wstawiają datę i godzinę. Przycisk GPS ustala kraj z współrzędnych offline, a przy zasięgu podpowiada też miasto.", "Печать: «Печать / PDF» → в Safari выбираете принтер или «Сохранить в Файлы» (PDF). Бланк печатается 1-в-1 как оригинал.": "Wydruk: «Wydruk / PDF» → w Safari wybierasz drukarkę albo «Zapisz w Plikach» (PDF). Formularz drukuje się 1:1 jak oryginał.", "Чтобы открывалось в один тап: откройте файл в Safari → «Поделиться» → «На экран \"Домой\"».": "Aby otwierało się jednym dotknięciem: otwórz plik w Safari → «Udostępnij» → «Do ekranu początkowego».", "Карта создана": "Karta utworzona", "Карта добавлена": "Karta dodana", "Карта загружена": "Karta wczytana", "Это единственная карта": "To jedyna karta", "Подсветка выключена": "Podświetlenie wyłączone", "Пустые графы подсвечены": "Puste pola podświetlone", "Копия сохранена в Загрузки": "Kopia zapisana w Pobranych", "Восстановлено": "Przywrócono", "Не удалось восстановить": "Nie udało się przywrócić", "Файл не читается": "Nie można odczytać pliku", "Дата и время подставлены": "Data i godzina wstawione", "Добавлено": "Dodano", "Подпись очищена": "Podpis wyczyszczony", "Сначала впиши литры первого чека": "Najpierw wpisz litry z pierwszego paragonu", "Геолокация недоступна": "Geolokalizacja niedostępna", "Нет доступа к геолокации": "Brak dostępu do geolokalizacji", "Страна не определена": "Nie ustalono kraju", "Удалить запись?": "Usunąć wpis?", "Восстановить состояние из копии? Текущие карты будут заменены.": "Przywrócić stan z kopii? Bieżące karty zostaną zastąpione.", "Название карты:": "Nazwa karty:", "Название новой карты:": "Nazwa nowej karty:", "Название карты (можно с 4 последними цифрами):": "Nazwa karty (można z 4 ostatnimi cyframi):"} };
 const IPAT = { ua: [[new RegExp("^Последняя копия — (\\d+) дн\\. назад\\.$"),"Остання копія — $1 дн. тому."],[new RegExp("^Строка (\\d+)$"),"Рядок $1"],[new RegExp("^(\\d+) / (\\d+) строк на бланке$"),"$1 / $2 рядків на бланку"],[new RegExp("^сохранено (.+)$"),"збережено $1"],[new RegExp("^Удалить «(.+)»\\? Данные пропадут\\.$"),"Видалити «$1»? Дані зникнуть."],[new RegExp("^Убрать «(.+)» из списка\\? В уже заполненных строках она останется\\.$"),"Прибрати «$1» зі списку? У вже заповнених рядках вона залишиться."],[new RegExp("^Копии карты нет (.+)\\. Если планшет пропадёт — данные пропадут вместе с ним\\.$"),"Копії карти немає $1. Якщо планшет зникне — дані зникнуть разом з ним."],[new RegExp("^уже (\\d+) дн\\.$"),"уже $1 дн."]], pl: [[new RegExp("^Последняя копия — (\\d+) дн\\. назад\\.$"),"Ostatnia kopia — $1 dni temu."],[new RegExp("^Строка (\\d+)$"),"Wiersz $1"],[new RegExp("^(\\d+) / (\\d+) строк на бланке$"),"$1 / $2 wierszy na formularzu"],[new RegExp("^сохранено (.+)$"),"zapisano $1"],[new RegExp("^Удалить «(.+)»\\? Данные пропадут\\.$"),"Usunąć «$1»? Dane przepadną."],[new RegExp("^Убрать «(.+)» из списка\\? В уже заполненных строках она останется\\.$"),"Usunąć «$1» z listy? W już wypełnionych wierszach pozostanie."],[new RegExp("^Копии карты нет (.+)\\. Если планшет пропадёт — данные пропадут вместе с ним\\.$"),"Nie ma kopii karty $1. Jeśli tablet zniknie — dane znikną razem z nim."],[new RegExp("^уже (\\d+) дн\\.$"),"już $1 dni"]] };
+/* --- строки экрана «Итоги» --- */
+(function(){
+  const ADD = {
+    ua: {"Итоги":"Підсумки","Итоги месяца":"Підсумки місяця","Ночная работа · окно 22:00–05:00":"Нічна робота · вікно 22:00–05:00",
+      "Всего":"Разом","Ночей задействовано":"Ночей задіяно","из":"з","Средняя рабочая ночь":"Середня робоча ніч","Полных ночей":"Повних ночей",
+      "Расход ON":"Витрата ON","Объём работы":"Обсяг роботи","Пробег":"Пробіг","Заказов":"Замовлень","Порожний пробег":"Порожній пробіг",
+      "норма ЕС":"норма ЄС","типовой":"типовий","Вес всего":"Вага разом","Пробег машины":"Пробіг машини","Разброс по отрезкам":"Розкид по відрізках",
+      "Проверка карты":"Перевірка карти","Замечаний нет":"Зауважень немає","Нагрузка месяца":"Навантаження місяця",
+      "Тяжёлый":"Важкий","Обычный":"Звичайний","Лёгкий":"Легкий","Лист для офиса":"Аркуш для офісу",
+      "Считается по времени погрузок и выгрузок из карты — цифра ориентировочная, тахограф она не заменяет.":"Рахується за часом завантажень і вивантажень з карти — цифра орієнтовна, тахограф вона не замінює.",
+      "Норма порожнего пробега — Eurostat road_go_ta_tott, 2024: в международных перевозках ЕС 12,6 %.":"Норма порожнього пробігу — Eurostat road_go_ta_tott, 2024: у міжнародних перевезеннях ЄС 12,6 %.",
+      "Расход посчитается, когда будет хотя бы две заправки do pełna с показаниями счётчика.":"Витрата порахується, коли буде щонайменше дві заправки do pełna з показаннями лічильника.",
+      "Пока нечего считать. Заполните Trasa и заправки — итоги соберутся сами.":"Поки нема чого рахувати. Заповніть Trasa і заправки — підсумки зберуться самі.",
+      "Счётчик сходится, показания закрыты, чеки на месте.":"Лічильник сходиться, показання закриті, чеки на місці."},
+    pl: {"Итоги":"Podsumowanie","Итоги месяца":"Podsumowanie miesiąca","Ночная работа · окно 22:00–05:00":"Praca nocna · okno 22:00–05:00",
+      "Всего":"Łącznie","Ночей задействовано":"Nocy z pracą","из":"z","Средняя рабочая ночь":"Średnia noc","Полных ночей":"Pełnych nocy",
+      "Расход ON":"Spalanie ON","Объём работы":"Praca","Пробег":"Przebieg","Заказов":"Zlecenia","Порожний пробег":"Puste przebiegi",
+      "норма ЕС":"średnia UE","типовой":"typowy","Вес всего":"Waga łącznie","Пробег машины":"Stan licznika","Разброс по отрезкам":"Rozrzut na odcinkach",
+      "Проверка карты":"Kontrola karty","Замечаний нет":"Bez uwag","Нагрузка месяца":"Obciążenie miesiąca",
+      "Тяжёлый":"Ciężki","Обычный":"Typowy","Лёгкий":"Lekki","Лист для офиса":"Arkusz dla biura",
+      "Считается по времени погрузок и выгрузок из карты — цифра ориентировочная, тахограф она не заменяет.":"Liczone na podstawie czasów załadunku i rozładunku z karty — wartość orientacyjna, nie zastępuje tachografu.",
+      "Норма порожнего пробега — Eurostat road_go_ta_tott, 2024: в международных перевозках ЕС 12,6 %.":"Norma pustych przebiegów — Eurostat road_go_ta_tott, 2024: w transporcie międzynarodowym UE 12,6 %.",
+      "Расход посчитается, когда будет хотя бы две заправки do pełna с показаниями счётчика.":"Spalanie policzy się, gdy będą co najmniej dwa tankowania do pełna ze stanem licznika.",
+      "Пока нечего считать. Заполните Trasa и заправки — итоги соберутся сами.":"Na razie nie ma czego liczyć. Wypełnij Trasę i tankowania — podsumowanie zbierze się samo.",
+      "Счётчик сходится, показания закрыты, чеки на месте.":"Licznik zgodny, stany końcowe uzupełnione, paragony na miejscu."}
+  };
+  for(const L in ADD){ for(const k in ADD[L]) I18N[L][k] = ADD[L][k]; }
+})();
 const IREV = (function(){ const m={}; for(const L of ["ua","pl"]){ const d=I18N[L]; for(const k in d){ m[nrm(d[k])] = k; } } return m; })();
 function nrm(s){ return String(s).trim().replace(/\s+/g," "); }
 function T(s, depth){
@@ -521,7 +599,7 @@ function cardF(path,label,kind){
 }
 
 /* ================= Экраны ================= */
-const TABS = [["main","Карта"],["trasa","Trasa"],["tank","Заправки"],["koszty","Расходы"],["info","Инструкция"]];
+const TABS = [["main","Карта"],["trasa","Trasa"],["tank","Заправки"],["koszty","Расходы"],["itogi","Итоги"],["info","Инструкция"]];
 let activeTab = "main";
 
 function renderTabs(){
@@ -863,7 +941,361 @@ function applyHl(){
   if(DB.hlEmpty === false) document.querySelectorAll(".empty").forEach(e=>e.classList.remove("empty"));
   else paintEmpty();
 }
-function renderAll(){ renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderInfo(); renderCards(); fillBackupInfo(); paintRows(); applyHl(); applyLang(); }
+/* ================= Итоги месяца =================
+   Считается только из того, что уже вписано в карту.
+   Норма порожнего пробега — Eurostat road_go_ta_tott, 2024:
+   в международных перевозках ЕС порожними выполнено 12,6 % км.
+   Окно 22:00–05:00 — запрет ночной езды в Швейцарии (art. 91 VRV).  */
+const NORM_EMPTY = 12.6;
+const FUEL_LO = 25, FUEL_HI = 33, FUEL_MIN = 18, FUEL_MAX = 40;
+const NIGHT_FROM = 22, NIGHT_TO = 5;
+
+function nnum(v){
+  const s = String(v == null ? "" : v).replace(/\s/g, "").replace(",", ".");
+  if(!s || !/^-?\d+(\.\d+)?$/.test(s)) return null;
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+function dtOf(d, g){
+  if(!d || !g) return null;
+  const p = String(d).split("-").map(Number);
+  const q = String(g).split(":").map(Number);
+  if(p.length < 3 || !p[0] || isNaN(q[0])) return null;
+  return new Date(p[0], p[1] - 1, p[2], q[0], q[1] || 0, 0, 0);
+}
+function dkey(dt){
+  return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
+}
+function dshort(k){ const a = k.split("-"); return a[2] + "." + a[1]; }
+function addNight(a, b, map){
+  if(!a || !b || b <= a) return;
+  const spanH = (b - a) / 3600000;
+  const wins = [];
+  let d = new Date(a.getFullYear(), a.getMonth(), a.getDate() - 1);
+  const stop = new Date(b.getFullYear(), b.getMonth(), b.getDate() + 1);
+  let guard = 0;
+  while(d <= stop && guard++ < 120){
+    wins.push([new Date(d.getFullYear(), d.getMonth(), d.getDate(), NIGHT_FROM, 0, 0, 0),
+               new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, NIGHT_TO, 0, 0, 0)]);
+    d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+  }
+  const hit = [];
+  wins.forEach(function(w){
+    const s = Math.max(a.getTime(), w[0].getTime());
+    const e = Math.min(b.getTime(), w[1].getTime());
+    if(e > s) hit.push([w[0], (e - s) / 3600000]);
+  });
+  if(!hit.length) return;
+  /* длинный перегон — внутри точно был отдых, считаем только первую и последнюю ночь */
+  const use = (spanH > 36 && hit.length > 2) ? [hit[0], hit[hit.length - 1]] : hit;
+  use.forEach(function(x){
+    const k = dkey(x[0]);
+    map[k] = Math.min(7, (map[k] || 0) + x[1]);
+  });
+}
+
+function itogi(){
+  const o = {km:0, loaded:0, empty:0, emptyPct:null, orders:0, pca:0, weight:0, weighed:0,
+             countries:[], days:[], nightTotal:0, nightCount:0, nightFull:0, nightAvg:0,
+             streak:0, streakFrom:"", streakTo:"",
+             litres:0, segs:[], fuel:null, fuelSrc:"", spread:null,
+             odo:null, from:"", to:"", flags:[]};
+  const L = trasaLines();
+  const kmP = nnum(C.stany.kmP), kmK = nnum(C.stany.kmK);
+
+  /* --- километры, вес, страны, ночи --- */
+  const cmap = {}, nmap = {}, seq = [];
+  let prevW = null, dmin = null, dmax = null;
+  L.forEach(function(r, i){
+    const zl = nnum(r.zl), wl = nnum(r.wl);
+    if(zl != null && wl != null && wl >= zl && wl - zl < 5000) o.loaded += wl - zl;
+    if(prevW != null && zl != null && zl >= prevW && zl - prevW < 3000) o.empty += zl - prevW;
+    if(zl != null) seq.push({v:zl, i:i + 1, what:"загрузка"});
+    if(wl != null){ seq.push({v:wl, i:i + 1, what:"выгрузка"}); prevW = wl; }
+    [r.zk, r.wk].forEach(function(k){
+      const s = String(k || "").trim().toUpperCase();
+      if(s) cmap[s] = (cmap[s] || 0) + 1;
+    });
+    const w = nnum(r.waga);
+    if(w != null){ o.weight += w; o.weighed++; }
+    else if(String(r.waga || "").trim().toUpperCase() === "PCA") o.pca++;
+    const a = dtOf(r.zd, r.zg), b = dtOf(r.wd, r.wg);
+    if(a && b) addNight(a, b, nmap);
+    [a, b].forEach(function(x){
+      if(!x) return;
+      if(!dmin || x < dmin) dmin = x;
+      if(!dmax || x > dmax) dmax = x;
+    });
+  });
+  o.orders = C.trasa.filter(function(r){
+    return rowLines(r).some(function(x){ return x.nr || x.zm || x.wm || x.zl || x.wl; });
+  }).length;
+  o.loaded = Math.round(o.loaded);
+  o.empty = Math.round(o.empty);
+  o.km = (kmP != null && kmK != null && kmK > kmP) ? Math.round(kmK - kmP) : (o.loaded + o.empty);
+  if(o.loaded + o.empty > 0) o.emptyPct = o.empty / (o.loaded + o.empty) * 100;
+  o.countries = Object.keys(cmap).map(function(k){ return {k:k, n:cmap[k]}; })
+                      .sort(function(a, b){ return b.n - a.n; });
+  o.odo = kmK != null ? kmK : (seq.length ? Math.max.apply(null, seq.map(function(x){ return x.v; })) : null);
+
+  /* --- ночи по дням --- */
+  if(dmin && dmax){
+    o.from = dkey(dmin); o.to = dkey(dmax);
+    let d = new Date(dmin.getFullYear(), dmin.getMonth(), dmin.getDate()), guard = 0;
+    while(d <= dmax && guard++ < 45){
+      const k = dkey(d);
+      o.days.push({k:k, h:Math.round((nmap[k] || 0) * 10) / 10});
+      d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    }
+  }
+  let run = 0, from = "";
+  o.days.forEach(function(x){
+    o.nightTotal += x.h;
+    if(x.h > 0){
+      o.nightCount++;
+      if(x.h >= 6.9) o.nightFull++;
+      if(!run) from = x.k;
+      run++;
+      if(run > o.streak){ o.streak = run; o.streakFrom = from; o.streakTo = x.k; }
+    } else run = 0;
+  });
+  o.nightTotal = Math.round(o.nightTotal);
+  o.nightAvg = o.nightCount ? Math.round(o.nightTotal / o.nightCount * 10) / 10 : 0;
+
+  /* --- топливо: только ON тягача --- */
+  const TN = C.tankON.filter(function(r){ return r.d || r.litry || r.licznik; });
+  TN.forEach(function(r){ o.litres += litSum(r.litry).total; });
+  o.litres = Math.round(o.litres * 100) / 100;
+  const full = TN.filter(function(r){ return String(r.pelna) === "tak" && nnum(r.licznik) != null; })
+                 .sort(function(a, b){ return nnum(a.licznik) - nnum(b.licznik); });
+  for(let i = 1; i < full.length; i++){
+    const km = nnum(full[i].licznik) - nnum(full[i - 1].licznik);
+    const lt = litSum(full[i].litry).total;
+    if(km > 50 && lt > 0) o.segs.push({a:full[i - 1].d, b:full[i].d, km:km, lt:lt, l100:lt / km * 100});
+  }
+  const palP = nnum(C.stany.palP), palK = nnum(C.stany.palK);
+  if(palP != null && palK != null && palP > 100 && o.litres > 0 && o.km > 0){
+    o.fuel = (palP + o.litres - palK) / o.km * 100; o.fuelSrc = "бак";
+  } else if(o.segs.length){
+    const k = o.segs.reduce(function(a, s){ return a + s.km; }, 0);
+    const l = o.segs.reduce(function(a, s){ return a + s.lt; }, 0);
+    o.fuel = l / k * 100; o.fuelSrc = "отрезки";
+  }
+  if(o.segs.length > 1){
+    const v = o.segs.map(function(s){ return s.l100; });
+    o.spread = Math.max.apply(null, v) - Math.min.apply(null, v);
+  }
+
+  /* --- проверки --- */
+  for(let i = 1; i < seq.length; i++){
+    const step = seq[i].v - seq[i - 1].v;
+    if(step < 0) o.flags.push({t:"bad", h:"Счётчик идёт назад: строка " + seq[i].i,
+                               d:seq[i - 1].v + " → " + seq[i].v});
+    else if(step > 2500) o.flags.push({t:"bad", h:"Скачок счётчика: строка " + seq[i].i,
+                                       d:seq[i - 1].v + " → " + seq[i].v + " (+" + Math.round(step) + " км)"});
+  }
+  if(kmP != null && kmK != null && o.loaded + o.empty > 0){
+    const diff = Math.abs((kmK - kmP) - (o.loaded + o.empty));
+    if(diff > 60) o.flags.push({t:"bad", h:"Километры не сходятся",
+                                d:"по строкам " + (o.loaded + o.empty) + " км, по счётчику " + Math.round(kmK - kmP) + " км"});
+  }
+  const nk = [];
+  if(kmK == null) nk.push("Stan licznika KM");
+  if(palK == null) nk.push("Stan Paliwa");
+  if(nnum(C.stany.kompK) == null) nk.push("Zużycie z komputera");
+  if(nnum(C.stany.adbK) == null) nk.push("Ad-Blue");
+  if(nk.length) o.flags.push({t:"warn", h:"Не закрыты конечные показания", d:nk.join(" · ")});
+  TN.forEach(function(r, i){
+    if(String(r.paragon) === "nie")
+      o.flags.push({t:"warn", h:"Нет чека: заправка " + (i + 1),
+                    d:(fmtD(r.d, true) || "") + " · " + litSum(r.litry).total + " л"});
+  });
+  const notFull = TN.filter(function(r){ return String(r.pelna) === "nie"; }).length;
+  if(notFull && o.fuelSrc === "отрезки")
+    o.flags.push({t:"warn", h:"Не все заправки do pełna", d:"расход по отрезкам считается приблизительно"});
+  return o;
+}
+
+function loadLevel(o){
+  const s = [o.km > 11500 ? 2 : (o.km >= 8500 ? 1 : 0),
+             o.nightTotal > 75 ? 2 : (o.nightTotal >= 40 ? 1 : 0),
+             o.orders > 22 ? 2 : (o.orders >= 15 ? 1 : 0)];
+  const n = s[0] + s[1] + s[2];
+  return n >= 5 ? "Тяжёлый" : (n >= 2 ? "Обычный" : "Лёгкий");
+}
+
+/* --- графика: SVG, чтобы печаталась и без фоновой заливки --- */
+function nightSvg(o){
+  const d = o.days.length ? o.days : [{k:"", h:0}];
+  const W = 320, H = 62, gap = d.length > 1 ? 1.4 : 0;
+  const bw = (W - gap * (d.length - 1)) / d.length;
+  let s = "";
+  d.forEach(function(x, i){
+    const hh = x.h <= 0 ? 1.6 : Math.max(2.5, x.h / 7 * H);
+    const cls = x.h <= 0 ? "nb-zero" : (x.h >= 6.9 ? "nb-full" : "nb-part");
+    s += '<rect class="' + cls + '" x="' + (i * (bw + gap)).toFixed(2) + '" y="' + (H - hh).toFixed(2) +
+         '" width="' + bw.toFixed(2) + '" height="' + hh.toFixed(2) + '"/>';
+  });
+  return '<svg class="chart nchart" viewBox="0 0 ' + W + ' ' + (H + 1) + '" preserveAspectRatio="none" role="img">' +
+         s + '<rect class="ax" x="0" y="' + H + '" width="' + W + '" height="0.7"/></svg>';
+}
+function scaleSvg(val, lo, hi, mark, band){
+  const W = 320, H = 17;
+  const px = function(v){ return Math.max(0, Math.min(1, (v - lo) / (hi - lo))) * W; };
+  let s = '<rect class="sc-bg" x="0" y="0" width="' + W + '" height="' + H + '"/>';
+  if(band) s += '<rect class="sc-band" x="' + px(band[0]).toFixed(1) + '" y="0" width="' +
+                (px(band[1]) - px(band[0])).toFixed(1) + '" height="' + H + '"/>';
+  if(val != null) s += '<rect class="sc-fill" x="' + (px(val) - 1.4).toFixed(1) + '" y="-2" width="2.8" height="' + (H + 4) + '"/>';
+  if(mark != null) s += '<rect class="sc-mark" x="' + (px(mark) - 0.9).toFixed(1) + '" y="-3" width="1.8" height="' + (H + 6) + '"/>';
+  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img">' + s + '</svg>';
+}
+function barSvg(val, max){
+  const W = 320, H = 15;
+  const w = Math.max(1, Math.min(1, val / max) * W);
+  return '<svg class="chart bchart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img">' +
+         '<rect class="sc-bg" x="0" y="0" width="' + W + '" height="' + H + '"/>' +
+         '<rect class="bar-a" x="0" y="0" width="' + w.toFixed(1) + '" height="' + H + '"/></svg>';
+}
+const KRAJ_RU = {DE:"Германия", FR:"Франция", BE:"Бельгия", NL:"Нидерланды", IT:"Италия", CH:"Швейцария",
+  AT:"Австрия", A:"Австрия", D:"Германия", F:"Франция", B:"Бельгия", I:"Италия", E:"Испания", PL:"Польша", CZ:"Чехия", SK:"Словакия", ES:"Испания", DK:"Дания", SE:"Швеция",
+  NO:"Норвегия", HU:"Венгрия", SI:"Словения", LT:"Литва", LV:"Латвия", EE:"Эстония", RO:"Румыния",
+  HR:"Хорватия", LU:"Люксембург", GB:"Британия", PT:"Португалия", FI:"Финляндия", IE:"Ирландия", GR:"Греция"};
+function n1(v){ return String(Math.round(v * 10) / 10).replace(".", ","); }
+function nkm(v){ return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+
+function renderItogi(){
+  const o = itogi();
+  if(!o.orders && !o.litres){
+    $("#pane-itogi").innerHTML = '<div class="card"><h3>Итоги месяца</h3>' +
+      '<p class="hint">Пока нечего считать. Заполните Trasa и заправки — итоги соберутся сами.</p></div>';
+    return;
+  }
+  const nightBlock = '<div class="card"><h3>Ночная работа · окно 22:00–05:00</h3>' +
+    '<div class="sum-grid">' +
+      '<div class="sum-cell"><span>Всего</span><b>' + o.nightTotal + ' ч</b></div>' +
+      '<div class="sum-cell"><span>Ночей задействовано</span><b>' + o.nightCount + ' <i style="font-style:normal;font-size:13px;color:var(--dim)">из ' + o.days.length + '</i></b></div>' +
+      '<div class="sum-cell"><span>Средняя рабочая ночь</span><b>' + n1(o.nightAvg) + ' ч</b></div>' +
+      '<div class="sum-cell"><span>Полных ночей</span><b>' + o.nightFull + '</b></div>' +
+    '</div>' +
+    '<div style="margin-top:12px">' + nightSvg(o) + '</div>' +
+    '<div class="sum-note" style="display:flex;justify-content:space-between;margin-top:3px">' +
+      '<span>' + (o.days.length ? dshort(o.days[0].k) : "") + '</span>' +
+      '<span>' + (o.days.length ? dshort(o.days[o.days.length - 1].k) : "") + '</span></div>' +
+    (o.streak >= 3 ? '<div class="sum-flag bad"><b>Серия: ' + o.streak + ' ночей подряд</b>' +
+      dshort(o.streakFrom) + ' — ' + dshort(o.streakTo) + '</div>' : "") +
+    '<p class="hint">Считается по времени погрузок и выгрузок из карты — цифра ориентировочная, тахограф она не заменяет.</p></div>';
+
+  const fuelBlock = '<div class="card"><h3>Расход ON</h3>' +
+    (o.fuel != null
+      ? '<div class="sum-big">' + n1(o.fuel) + ' <span style="font-size:13px;color:var(--dim);font-weight:400">л / 100 км</span></div>' +
+        '<div class="sum-note" style="margin:2px 0 10px">залито ' + n1(o.litres) + ' л · ' + nkm(o.km) + ' км</div>' +
+        scaleSvg(o.fuel, FUEL_MIN, FUEL_MAX, null, [FUEL_LO, FUEL_HI]) +
+        '<div class="sum-note" style="display:flex;justify-content:space-between;margin-top:3px">' +
+          '<span>' + FUEL_MIN + '</span><span>типовой ' + FUEL_LO + '–' + FUEL_HI + '</span><span>' + FUEL_MAX + '</span></div>'
+      : '<p class="hint">Расход посчитается, когда будет хотя бы две заправки do pełna с показаниями счётчика.</p>') +
+    (o.segs.length ? '<div style="margin-top:12px">' + o.segs.map(function(s){
+        return '<div class="sum-row"><i>' + (fmtD(s.a, true) || "") + ' → ' + (fmtD(s.b, true) || "") + '</i>' +
+               '<span>' + n1(s.l100) + '</span></div>'; }).join("") + '</div>' : "") +
+    (o.spread != null ? '<div class="sum-note" style="margin-top:8px">Разброс по отрезкам ' + n1(o.spread) + ' л</div>' : "") +
+    '</div>';
+
+  const volBlock = '<div class="card"><h3>Объём работы</h3>' +
+    '<div class="sum-grid">' +
+      '<div class="sum-cell"><span>Пробег</span><b>' + nkm(o.km) + '</b></div>' +
+      '<div class="sum-cell"><span>Заказов</span><b>' + o.orders + (o.pca ? ' <i style="font-style:normal;font-size:13px;color:var(--dim)">PCA ' + o.pca + '</i>' : "") + '</b></div>' +
+    '</div>' +
+    (o.emptyPct != null
+      ? '<div style="margin-top:12px"><div class="sum-note" style="margin-bottom:5px">Порожний пробег <b style="color:var(--ink)">' +
+        n1(o.emptyPct) + ' %</b> · ' + nkm(o.empty) + ' км · норма ЕС ' + String(NORM_EMPTY).replace(".", ",") + ' %</div>' +
+        scaleSvg(o.emptyPct, 0, 30, NORM_EMPTY, null) +
+        '<div class="sum-note" style="display:flex;justify-content:space-between;margin-top:3px"><span>0 %</span><span>норма ЕС</span><span>30 %</span></div></div>'
+      : "") +
+    '<div style="margin-top:12px">' +
+      (o.weighed ? '<div class="sum-row"><i>Вес всего</i><span>' + n1(o.weight / 1000) + ' т</span></div>' : "") +
+      (o.odo != null ? '<div class="sum-row"><i>Пробег машины</i><span>' + nkm(o.odo) + ' км</span></div>' : "") +
+    '</div>' +
+    (o.countries.length ? '<div style="margin-top:10px">' + o.countries.map(function(c){
+        return '<div class="sum-row"><i>' + (KRAJ_RU[c.k] || c.k) + '</i><span>' + c.n + '</span></div>'; }).join("") + '</div>' : "") +
+    '<p class="hint">Норма порожнего пробега — Eurostat road_go_ta_tott, 2024: в международных перевозках ЕС 12,6 %.</p></div>';
+
+  const flagBlock = '<div class="card"><h3>Проверка карты</h3>' +
+    (o.flags.length
+      ? o.flags.map(function(f){ return '<div class="sum-flag ' + f.t + '"><b>' + esc(f.h) + '</b>' + esc(f.d) + '</div>'; }).join("")
+      : '<div class="sum-flag ok"><b>Замечаний нет</b>Счётчик сходится, показания закрыты, чеки на месте.</div>') +
+    '</div>';
+
+  const lvl = loadLevel(o);
+  const endBlock = '<div class="card"><h3>Нагрузка месяца</h3>' +
+    '<div class="sum-big">' + lvl + '</div>' +
+    '<p class="sum-note" style="margin:6px 0 0">Пробег ' + nkm(o.km) + ' км · заказов ' + o.orders +
+      ' · ночная работа ' + o.nightTotal + ' ч' + (o.streak >= 3 ? ', серия ' + o.streak + ' ночей подряд' : "") + '.</p>' +
+    '<button class="add" id="btnItogiPrint" style="margin-top:12px">Лист для офиса</button></div>';
+
+  $("#pane-itogi").innerHTML = nightBlock + fuelBlock + volBlock + flagBlock + endBlock;
+}
+
+/* ================= Лист для офиса (печать, монохром, польский) ================= */
+const LVL_PL = {"Тяжёлый":"Miesiąc ciężki", "Обычный":"Miesiąc typowy", "Лёгкий":"Miesiąc lekki"};
+function printItogi(){
+  const o = itogi();
+  const h = C.head;
+  const kier = [h.k1i, h.k1n].filter(Boolean).join(" ");
+  const row = function(a, b){ return '<tr><td style="border:none;padding:2px 0">' + a +
+    '</td><td style="border:none;padding:2px 0;text-align:right">' + esc(b) + '</td></tr>'; };
+  const okres = (o.from && o.to) ? (fmtD(o.from) + " – " + fmtD(o.to)) : "";
+  return '<div class="sheet ito">' +
+    '<div class="itohead"><div><div class="itotitle">Podsumowanie miesiąca</div>' +
+      '<div class="itosub">' + esc(C.name || "") + '</div></div>' +
+      '<div class="itosub" style="text-align:right">' + esc(h.nrRej || "") + '<br>' + esc(kier) + '</div></div>' +
+
+    '<div class="itoh">Praca w oknie 22:00–05:00</div>' +
+    '<table class="itoboxes"><tr>' +
+      '<td class="itobox"><div class="itolab">Łącznie</div><div class="itobig">' + o.nightTotal + ' h</div></td>' +
+      '<td class="itobox"><div class="itolab">Nocy z pracą</div><div class="itobig">' + o.nightCount + ' / ' + o.days.length + '</div></td>' +
+      '<td class="itobox"><div class="itolab">Średnia noc</div><div class="itobig">' + n1(o.nightAvg) + ' h</div></td>' +
+      '<td class="itobox"><div class="itolab">Pełnych nocy</div><div class="itobig">' + o.nightFull + '</div></td>' +
+    '</tr></table>' +
+    '<div style="margin-top:6px">' + nightSvg(o) + '</div>' +
+    '<div class="itoax"><span>' + (o.days.length ? dshort(o.days[0].k) : "") + '</span><span>' +
+      (o.days.length ? dshort(o.days[o.days.length - 1].k) : "") + '</span></div>' +
+    '<div class="itonote">Czarne słupki — pełne 7 h w oknie, szare — częściowo, kreska przy osi — noc wolna.</div>' +
+    (o.streak >= 3 ? '<div class="itoser">Seria: ' + o.streak + ' nocy pod rząd (' +
+      dshort(o.streakFrom) + " – " + dshort(o.streakTo) + ')</div>' : "") +
+
+    '<div class="itoh">Praca</div>' +
+    '<table class="nb itotab">' +
+      row("Okres", okres) +
+      row("Przebieg", nkm(o.km) + " km") +
+      row("Zlecenia", o.orders + (o.pca ? " (w tym PCA: " + o.pca + ")" : "")) +
+      (o.weighed ? row("Waga łącznie", n1(o.weight / 1000) + " t") : "") +
+      (o.emptyPct != null ? row("Puste przebiegi", n1(o.emptyPct) + " % · " + nkm(o.empty) + " km") : "") +
+      (o.fuel != null ? row("Spalanie ON", n1(o.fuel) + " l/100 km") : "") +
+      (o.litres ? row("Zatankowano ON", n1(o.litres) + " l") : "") +
+      (o.countries.length ? row("Kraje", o.countries.map(function(c){ return c.k; }).join(", ")) : "") +
+      (o.odo != null ? row("Stan licznika", nkm(o.odo) + " km") : "") +
+    '</table>' +
+
+    (o.emptyPct != null ? '<div style="margin-top:8px">' + scaleSvg(o.emptyPct, 0, 30, NORM_EMPTY, null) +
+      '<div class="itoax"><span>0 %</span><span>średnia UE ' + String(NORM_EMPTY).replace(".", ",") + ' %</span><span>30 %</span></div></div>' : "") +
+
+    '<div class="itoh">Dokumenty</div>' +
+    '<div class="itodoc">' + (o.flags.length
+      ? o.flags.map(function(f){ return '<div>• ' + esc(f.h) + " — " + esc(f.d) + '</div>'; }).join("")
+      : '<div>Bez uwag: licznik zgodny, stany końcowe uzupełnione, paragony na miejscu.</div>') + '</div>' +
+
+    '<div class="itolvl">' + (LVL_PL[loadLevel(o)] || "") + '</div>' +
+
+    '<div class="itofoot">Godziny nocne obliczone na podstawie czasów załadunku i rozładunku z karty drogowej — wartość orientacyjna, nie zastępuje danych z tachografu.<br>' +
+    'Norma pustych przebiegów: transport międzynarodowy UE ' + String(NORM_EMPTY).replace(".", ",") + ' % (Eurostat 2024, road_go_ta_tott).</div>' +
+    sigBlock() + '</div>';
+}
+function buildItogiPrint(){
+  $("#print").innerHTML = '<div class="page">' + printItogi() + '</div>';
+  fitPages();
+  fitCells();
+}
+
+function renderAll(){ renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderItogi(); renderInfo(); renderCards(); fillBackupInfo(); paintRows(); applyHl(); applyLang(); }
 
 async function fillBackupInfo(){
   const st = $("#bkState"); const list = $("#snapList");
@@ -1385,6 +1817,7 @@ document.addEventListener("click", async e=>{
 
   switch(t.id){
     case "btnPrint": buildPrint(); setTimeout(()=>window.print(),120); break;
+    case "btnItogiPrint": buildItogiPrint(); setTimeout(()=>window.print(),120); break;
     case "btnNew": { const n = prompt(T("Название новой карты:"), "Karta " + new Date().toLocaleDateString("ru-RU"));
       if(n===null) return; const c = newCard(n.trim()); DB.cards.push(c); DB.active=c.id; C=c; save(true); renderAll(); toast("Карта создана"); break; }
     case "btnRename": { const n = prompt(T("Название карты:"), C.name); if(n===null) return; C.name=n.trim()||C.name; save(true); renderCards(); break; }
