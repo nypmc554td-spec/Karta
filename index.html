@@ -223,6 +223,7 @@ svg.bchart{height:15px}
 .bar-a{fill:#B77400}
 .nt{fill:#6A727C;font-size:7px;font-family:-apple-system,Arial,sans-serif}
 .nstreak{fill:#C6402A}
+.nnum{fill:#3A3F46;font-size:5.6px;font-weight:600;font-family:-apple-system,Arial,sans-serif}
 /* ---- тот же экран на печать: только чёрный, серый и линия ---- */
 .sheet .nb-full{fill:#000}
 .sheet .nb-part{fill:#8C8C8C}
@@ -235,6 +236,7 @@ svg.bchart{height:15px}
 .sheet svg.nchart{height:auto}
 .sheet .nt{fill:#000;font-size:7px}
 .sheet .nstreak{fill:#000}
+.sheet .nnum{fill:#000;font-size:5.6px;font-weight:700}
 .ito{font-family:Arial,Helvetica,sans-serif}
 .itohead{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #000;padding-bottom:5px;margin-bottom:9px}
 .itotitle{font-size:13pt;font-weight:bold}
@@ -255,7 +257,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v34</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v35</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1136,9 +1138,9 @@ function loadLevel(o){
 }
 
 /* --- графика: SVG, чтобы печаталась и без фоновой заливки --- */
-function nightSvg(o){
+function nightSvg(o, nums){
   const d = o.days.length ? o.days : [{k:"", h:0}];
-  const W = 320, TOP = 58, gap = d.length > 1 ? 1.4 : 0;
+  const W = 320, TOP = nums ? 66 : 58, gap = d.length > 1 ? 1.4 : 0;
   const bw = (W - gap * (d.length - 1)) / d.length;
   const xOf = function(i){ return i * (bw + gap); };
   let bars = "", ticks = "", strip = "";
@@ -1147,9 +1149,13 @@ function nightSvg(o){
     const cls = x.h <= 0 ? "nb-zero" : (x.h >= 6.9 ? "nb-full" : "nb-part");
     bars += '<rect class="' + cls + '" x="' + xOf(i).toFixed(2) + '" y="' + (TOP - hh).toFixed(2) +
             '" width="' + bw.toFixed(2) + '" height="' + hh.toFixed(2) + '"/>';
+    /* на листе для офиса над каждым столбиком — часы, они читаются и на ч/б принтере */
+    if(nums && x.h > 0)
+      bars += '<text class="nnum" x="' + (xOf(i) + bw / 2).toFixed(2) + '" y="' +
+              Math.max(6, TOP - hh - 1.8).toFixed(2) + '" text-anchor="middle">' + Math.round(x.h) + '</text>';
     const day = parseInt(String(x.k).slice(8), 10);
     if(day === 1 || day % 5 === 0)
-      ticks += '<text class="nt" x="' + (xOf(i) + bw / 2).toFixed(2) + '" y="72" text-anchor="middle">' + day + '</text>';
+      ticks += '<text class="nt" x="' + (xOf(i) + bw / 2).toFixed(2) + '" y="' + (TOP + 14) + '" text-anchor="middle">' + day + '</text>';
   });
   /* полоска под самой длинной серией ночей подряд */
   if(o.streak >= 3){
@@ -1157,11 +1163,11 @@ function nightSvg(o){
     d.forEach(function(x, i){ if(a < 0 && x.k === o.streakFrom) a = i; });
     if(a >= 0){
       const b = a + o.streak - 1;
-      strip = '<rect class="nstreak" x="' + xOf(a).toFixed(2) + '" y="61" width="' +
+      strip = '<rect class="nstreak" x="' + xOf(a).toFixed(2) + '" y="' + (TOP + 3) + '" width="' +
               (xOf(b) + bw - xOf(a)).toFixed(2) + '" height="2.6"/>';
     }
   }
-  return '<svg class="chart nchart" viewBox="0 0 ' + W + ' 78" role="img">' +
+  return '<svg class="chart nchart" viewBox="0 0 ' + W + ' ' + (TOP + 20) + '" role="img">' +
          bars + '<rect class="ax" x="0" y="' + TOP + '" width="' + W + '" height="0.7"/>' +
          strip + ticks + '</svg>';
 }
@@ -1329,8 +1335,8 @@ function printItogi(){
       '<td class="itobox"><div class="itolab">Średnia noc</div><div class="itobig">' + n1(o.nightAvg) + ' h</div></td>' +
       '<td class="itobox"><div class="itolab">Pełnych nocy</div><div class="itobig">' + o.nightFull + '</div></td>' +
     '</tr></table>' +
-    '<div style="margin-top:6px">' + nightSvg(o) + '</div>' +
-    '<div class="itonote">Czarne słupki — pełne 7 h w oknie, szare — częściowo, kreska przy osi — noc wolna. Cyfry pod wykresem — dni miesiąca.</div>' +
+    '<div style="margin-top:6px">' + nightSvg(o, true) + '</div>' +
+    '<div class="itonote">Liczby nad słupkami — godziny w oknie nocnym (w zaokrągleniu). Cyfry pod wykresem — dni miesiąca. Czarne słupki — pełne 7 h, szare — częściowo, kreska przy osi — noc wolna. Pogrubiona linia pod osią — najdłuższa seria nocy pod rząd.</div>' +
     (o.streak >= 3 ? '<div class="itoser">Seria: ' + o.streak + ' nocy pod rząd (' +
       dshort(o.streakFrom) + " – " + dshort(o.streakTo) + ')</div>' : "") +
 
