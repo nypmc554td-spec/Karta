@@ -1876,8 +1876,10 @@ document.addEventListener("click", async e=>{
   }
 
   switch(t.id){
-    case "btnPrint": buildPrint(); setTimeout(()=>window.print(),120); break;
-    case "btnItogiPrint": if(buildItogiPrint()) setTimeout(()=>window.print(),120); break;
+    case "btnPrint": PRINT_MODE = "card"; buildPrint(); setTimeout(()=>window.print(),120); break;
+    case "btnItogiPrint": PRINT_MODE = "itogi";
+      if(buildItogiPrint()) setTimeout(()=>window.print(),120); else PRINT_MODE = "card";
+      break;
     case "btnNew": { const n = prompt(T("Название новой карты:"), "Karta " + new Date().toLocaleDateString("ru-RU"));
       if(n===null) return; const c = newCard(n.trim()); DB.cards.push(c); DB.active=c.id; C=c; save(true); renderAll(); toast("Карта создана"); break; }
     case "btnRename": { const n = prompt(T("Название карты:"), C.name); if(n===null) return; C.name=n.trim()||C.name; save(true); renderCards(); break; }
@@ -1923,7 +1925,11 @@ $("#fileIn").addEventListener("change", e=>{
   r.readAsText(f); e.target.value="";
 });
 
-window.addEventListener("beforeprint", buildPrint);
+let PRINT_MODE = "card";
+window.addEventListener("beforeprint", function(){
+  if(PRINT_MODE === "itogi") buildItogiPrint(); else buildPrint();
+});
+window.addEventListener("afterprint", function(){ PRINT_MODE = "card"; });
 
 /* ================= Офлайн ================= */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
