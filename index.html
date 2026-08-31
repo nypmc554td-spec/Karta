@@ -188,6 +188,9 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
   .page{margin:0;page-break-after:always;break-after:page;page-break-inside:avoid;break-inside:avoid}
   .page:last-child{page-break-after:auto;break-after:auto}
   @page{size:A4 portrait;margin:12mm}
+  /* Бланк остаётся ч/б, а лист «Итоги» печатается в цвете — Safari по умолчанию
+     выбрасывает фоны, поэтому здесь просим их сохранить. */
+  .sheet.ito, .sheet.ito *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 select.cur{flex:0 0 108px;padding-left:8px;padding-right:8px;font-size:15px}
@@ -252,12 +255,48 @@ svg.bchart{height:15px}
 .itodoc div{font-size:9pt;line-height:1.5}
 .itolvl{border:1.2px solid #000;font-size:11pt;font-weight:bold;text-align:center;padding:5px;margin-top:11px}
 .itofoot{font-size:7.5pt;line-height:1.4;border-top:1px solid #000;padding-top:5px;margin-top:9px}
+
+/* ---- Итоги: цветной лист ----
+   Бланк karty drogowej остаётся чёрно-белым — это копия бумажной формы.
+   Итоги уходят в офис PDF-ом, их смотрят с экрана — там цвет уместен.
+   Цифры над столбиками и подписи под шкалами остаются, чтобы лист
+   читался и если его всё-таки распечатают на ч/б принтере. */
+.sheet.ito{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sheet.ito .itohead{border-bottom-color:#B77400}
+.sheet.ito .itotitle{color:#B77400}
+.sheet.ito .itoh{color:#B77400;border-bottom-color:#E7D9BC}
+.sheet.ito .itoboxes td{border-color:#DCD8CF;background:#FAF8F4}
+.sheet.ito .itolab{color:#6A727C}
+.sheet.ito .nb-full{fill:#C6402A}
+.sheet.ito .nb-part{fill:#8A6BC4}
+.sheet.ito .nb-zero{fill:#D3D6DB}
+.sheet.ito .ax{fill:#15181C;opacity:.35}
+.sheet.ito .nstreak{fill:#C6402A}
+.sheet.ito .nt{fill:#6A727C}
+.sheet.ito .nnum{fill:#3A3F46}
+.sheet.ito .sc-bg{fill:#E9E7E1}
+.sheet.ito .sc-band{fill:#DCEBE1}
+.sheet.ito .sc-fill{fill:#2F7D4F}
+.sheet.ito .sc-mark{fill:#C6402A}
+.sheet.ito .itoser{border-color:#E0A697;background:#FBE8E4;color:#7A2A19;border-radius:6px}
+.sheet.ito .itoleg{font-size:7.5pt;color:#6A727C;margin-top:4px}
+.sheet.ito .itoleg i{display:inline-block;width:8px;height:8px;border-radius:2px;margin:0 4px 0 0;vertical-align:-1px}
+.sheet.ito .itoflag{border:1px solid;border-radius:6px;padding:5px 7px;margin-top:5px;font-size:9pt;line-height:1.4}
+.sheet.ito .itoflag b{font-weight:700}
+.sheet.ito .itoflag.bad{background:#FBE8E4;border-color:#E0A697;color:#7A2A19}
+.sheet.ito .itoflag.warn{background:#FDF3DC;border-color:#E0BE72;color:#5A4413}
+.sheet.ito .itoflag.ok{background:#E7F2EA;border-color:#9CC4AB;color:#22553A}
+.sheet.ito .itolvl{border-radius:8px}
+.sheet.ito .itolvl.lv-hi{border-color:#E0A697;background:#FBE8E4;color:#7A2A19}
+.sheet.ito .itolvl.lv-md{border-color:#E0BE72;background:#FDF3DC;color:#5A4413}
+.sheet.ito .itolvl.lv-lo{border-color:#9CC4AB;background:#E7F2EA;color:#22553A}
+.sheet.ito .itofoot{border-top-color:#DCD8CF;color:#6A727C}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v38</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v39</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -708,14 +747,14 @@ function renderMain(){
       <label class="f"><span>Pierwszy kierowca — расписаться пальцем</span></label>
       <canvas class="sigpad" data-sig="sig.k1"></canvas>
       <div class="sigrow"><button class="mini" data-sigclear="sig.k1">Очистить</button>
-        ${prevSig("k1") ? '<button class="mini" data-sigcopy="sig.k1">С прошлой карты</button>' : ""}
+        <button class="mini" data-sigcopy="sig.k1">С прошлой карты</button>
         <span class="hint" style="margin:0">${C.sig.k1?"подпись сохранена":"пусто"}</span></div>
     </div>
     <div class="sigwrap">
       <label class="f"><span>Drugi kierowca — расписаться пальцем</span></label>
       <canvas class="sigpad" data-sig="sig.k2"></canvas>
       <div class="sigrow"><button class="mini" data-sigclear="sig.k2">Очистить</button>
-        ${prevSig("k2") ? '<button class="mini" data-sigcopy="sig.k2">С прошлой карты</button>' : ""}
+        <button class="mini" data-sigcopy="sig.k2">С прошлой карты</button>
         <span class="hint" style="margin:0">${C.sig.k2?"подпись сохранена":"пусто"}</span></div>
     </div>
     <p class="hint">Подпись встанет на бланке над линией «Pierwszy kierowca» / «Drugi kierowca». Если оставить пусто — напечатается чистая линия, как в оригинале.</p>
@@ -1361,6 +1400,8 @@ function renderItogi(){
 const LVL = {"Тяжёлый":["Тяжёлый","Важкий","Ciężki"], "Обычный":["Обычный","Звичайний","Typowy"], "Лёгкий":["Лёгкий","Легкий","Lekki"]};
 function LVL_TXT(k){ const a = LVL[k] || [k,k,k]; const L = LG || lang(); return L === "pl" ? a[2] : (L === "ua" ? a[1] : a[0]); }
 const LVL_PL = {"Тяжёлый":"Miesiąc ciężki", "Обычный":"Miesiąc typowy", "Лёгкий":"Miesiąc lekki"};
+const LVL_CLS_MAP = {"Тяжёлый":"lv-hi", "Обычный":"lv-md", "Лёгкий":"lv-lo"};
+function LVL_CLS(k){ return LVL_CLS_MAP[k] || "lv-md"; }
 function printItogi(){
   LG = "pl";
   const o = itogi();
@@ -1382,7 +1423,11 @@ function printItogi(){
       '<td class="itobox"><div class="itolab">Pełnych nocy</div><div class="itobig">' + o.nightFull + '</div></td>' +
     '</tr></table>' +
     '<div style="margin-top:6px">' + nightSvg(o, true) + '</div>' +
-    '<div class="itonote">Liczby nad słupkami — godziny w oknie nocnym (w zaokrągleniu). Cyfry pod wykresem — dni miesiąca. Czarne słupki — pełne 7 h, szare — częściowo, kreska przy osi — noc wolna. Pogrubiona linia pod osią — najdłuższa seria nocy pod rząd.</div>' +
+    '<div class="itoleg">' +
+      '<i style="background:#C6402A"></i>pełne 7 h&nbsp;&nbsp;' +
+      '<i style="background:#8A6BC4"></i>częściowo&nbsp;&nbsp;' +
+      '<i style="background:#D3D6DB"></i>noc wolna</div>' +
+    '<div class="itonote">Liczby nad słupkami — godziny w oknie nocnym (w zaokrągleniu). Cyfry pod wykresem — dni miesiąca. Pogrubiona linia pod osią — najdłuższa seria nocy pod rząd.</div>' +
     (o.streak >= 3 ? '<div class="itoser">Seria: ' + o.streak + ' nocy pod rząd (' +
       dshort(o.streakFrom) + " – " + dshort(o.streakTo) + ')</div>' : "") +
 
@@ -1404,10 +1449,10 @@ function printItogi(){
 
     '<div class="itoh">Dokumenty</div>' +
     '<div class="itodoc">' + (o.flags.length
-      ? o.flags.map(function(f){ return '<div>• ' + esc(f.h) + " — " + esc(f.d) + '</div>'; }).join("")
-      : '<div>Bez uwag: licznik zgodny, stany końcowe uzupełnione, paragony na miejscu.</div>') + '</div>' +
+      ? o.flags.map(function(f){ return '<div class="itoflag ' + f.t + '"><b>' + esc(f.h) + '</b> ' + esc(f.d) + '</div>'; }).join("")
+      : '<div class="itoflag ok"><b>Bez uwag</b> licznik zgodny, stany końcowe uzupełnione, paragony na miejscu.</div>') + '</div>' +
 
-    '<div class="itolvl">' + (LVL_PL[loadLevel(o)] || "") + '</div>' +
+    '<div class="itolvl ' + LVL_CLS(loadLevel(o)) + '">' + (LVL_PL[loadLevel(o)] || "") + '</div>' +
 
     '<div class="itofoot">Godziny nocne obliczone na podstawie czasów załadunku i rozładunku z karty drogowej — wartość orientacyjna, nie zastępuje danych z tachografu.<br>' +
     'Norma pustych przebiegów: transport międzynarodowy UE ' + String(NORM_EMPTY).replace(".", ",") + ' % (Eurostat 2024, road_go_ta_tott).</div>' +
