@@ -257,7 +257,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v35</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v36</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -354,7 +354,26 @@ function addMyCard(kind, name){
   if(DB.mycards[k].indexOf(name)<0) DB.mycards[k].push(name);
 }
 
-function newCard(name){
+/* Подпись, которой расписывались в последний раз — чтобы не рисовать её заново
+   на каждой новой карте. Берём: с текущей карты → из запомненной → из последней,
+   где она вообще есть. */
+function lastSig(){
+  try{
+    if(C && C.sig && (C.sig.k1 || C.sig.k2)) return C.sig;
+    if(DB && DB.lastSig && (DB.lastSig.k1 || DB.lastSig.k2)) return DB.lastSig;
+    const list = (DB && DB.cards) || [];
+    for(let i = list.length - 1; i >= 0; i--){
+      const s = list[i] && list[i].sig;
+      if(s && (s.k1 || s.k2)) return s;
+    }
+  }catch(e){}
+  return null;
+}
+function rememberSig(){
+  try{ if(C && C.sig) DB.lastSig = {k1: C.sig.k1 || "", k2: C.sig.k2 || ""}; }catch(e){}
+}
+
+function newCard(name, seedSig){
   return {
     id: uid(),
     name: name || ("Karta " + new Date().toLocaleDateString("ru-RU")),
@@ -364,7 +383,7 @@ function newCard(name){
     stany:{kmP:"",kmK:"",palP:"",palK:"",kompP:"",kompK:"",adbP:"",adbK:""},
     trasa:[], tankON:[], tankAd:[], tankChl:[],
     zakupy:[], oplaty:[], serwisy:[], mandaty:[], wlasne:[],
-    sig:{k1:"",k2:""},
+    sig:{k1:(seedSig&&seedSig.k1)||"", k2:(seedSig&&seedSig.k2)||""},
     uwagi:"", printInstr:false
   };
 }
@@ -398,7 +417,11 @@ const LANGS = [["ru","Беларусь · Русский"],["ua","Україна
 function lang(){ try{ return (DB && DB.lang) || "ru"; }catch(e){ return "ru"; } }
 const I18N = { ua: {"+ Ещё загрузка": "+ Ще завантаження", "+ Ещё выгрузка": "+ Ще вивантаження", "Готово": "Готово", "Править": "Редагувати", "Печать / PDF": "Друк / PDF", "Новая карта": "Нова карта", "Переименовать": "Перейменувати", "Пустые": "Порожні", "Пустые ✓": "Порожні ✓", "Копия ⤴": "Копія ⤴", "Экспорт": "Експорт", "Импорт": "Імпорт", "Удалить": "Видалити", "Очистить": "Очистити", "Восстановить": "Відновити", "Сделать": "Зробити", "Сейчас": "Зараз", "Сег.": "Сьог.", "Сейч.": "Зараз", "Карта": "Карта", "Заправки": "Заправки", "Расходы": "Витрати", "Инструкция": "Інструкція", "Numer Wyjazdu — номер выезда": "Numer Wyjazdu — номер виїзду", "Numer Teczki — номер папки": "Numer Teczki — номер теки", "WYJAZD Z BAZY — начало работы": "WYJAZD Z BAZY — початок роботи", "POWRÓT NA BAZĘ — окончание работы": "POWRÓT NA BAZĘ — кінець роботи", "Bus — выезд с базы": "Bus — виїзд з бази", "Bus — возврат на базу": "Bus — повернення на базу", "Wyjazd Busem z bazy — выезд с базы": "Wyjazd Busem z bazy — виїзд з бази", "Przyjazd Busem do samochodu — приезд к тягачу": "Przyjazd Busem do samochodu — приїзд до тягача", "Powrót Busem do Bazy — выезд к базе": "Powrót Busem do Bazy — виїзд до бази", "Przyjazd Busem do bazy — приезд на базу": "Przyjazd Busem do bazy — приїзд на базу", "Stan licznika KM — километраж": "Stan licznika KM — кілометраж", "Stan Paliwa — топливо, %": "Stan Paliwa — пальне, %", "Załadunek — загрузка": "Załadunek — завантаження", "Wyładunek — выгрузка": "Wyładunek — вивантаження", "Miejscowość (левая колонка)": "Miejscowość (ліва колонка)", "Miejscowość (правая колонка)": "Miejscowość (права колонка)", "Data / Godz. — ПОСЛЕ окончания загрузки": "Data / Godz. — ПІСЛЯ завершення завантаження", "Data / Godz. — ПОСЛЕ окончания выгрузки": "Data / Godz. — ПІСЛЯ завершення вивантаження", "Za co — за что": "Za co — за що", "Podpisy — подписи": "Podpisy — підписи", "Pierwszy kierowca — расписаться пальцем": "Pierwszy kierowca — розписатися пальцем", "Drugi kierowca — расписаться пальцем": "Drugi kierowca — розписатися пальцем", "Примечания на бланк": "Примітки на бланк", "Дорожная карта. Инструкция по выполнению": "Дорожня карта. Інструкція із заповнення", "Резервные копии": "Резервні копії", "Копии внутри устройства": "Копії всередині пристрою", "Сохранить копию сейчас": "Зберегти копію зараз", "Как это работает": "Як це працює", "Итого по картам": "Разом за картками", "Всего": "Разом", "Мои карты": "Мої картки", "Банковские": "Банківські", "Топливные": "Паливні", "+ Добавить строку": "+ Додати рядок", "+ Заправка ON": "+ Заправка ON", "+ Заправка AdBlue": "+ Заправка AdBlue", "+ Заправка холодильника": "+ Заправка холодильника", "+ Покупка": "+ Покупка", "+ Оплата": "+ Оплата", "+ Сервис": "+ Сервіс", "+ Штраф": "+ Штраф", "+ Своя покупка": "+ Своя покупка", "+ чек": "+ чек", "+ добавить": "+ додати", "＋ Своя карта…": "＋ Своя картка…", "готово": "готово", "неполно": "неповно", "пусто": "порожньо", "нет загрузки": "немає завантаження", "нет выгрузки": "немає вивантаження", "подпись сохранена": "підпис збережено", "пока нет": "поки немає", "ни разу": "жодного разу", "без карты": "без картки", "своя карта / наличные": "своя картка / готівка", "т / кг": "т / кг", "сохраняю…": "зберігаю…", "Пусто.": "Порожньо.", "Пока нет.": "Поки немає.", "Пока пусто. Добавьте первую загрузку.": "Поки порожньо. Додайте перше завантаження.", "Копия ещё ни разу не сохранялась.": "Копію ще жодного разу не збережено.", "Последняя копия — сегодня.": "Остання копія — сьогодні.", "Эта страница всегда печатается 4-й — как в оригинальном комплекте.": "Ця сторінка завжди друкується четвертою — як в оригінальному комплекті.", "Раз в сутки приложение само кладёт файл копии в Загрузки. Кнопка «Копия ⤴» вверху отправляет его в облако или мессенджер одним тапом — это единственное, что спасёт данные, если устройство пропадёт.": "Раз на добу застосунок сам кладе файл копії в Завантаження. Кнопка «Копія ⤴» вгорі надсилає його в хмару або месенджер одним дотиком — це єдине, що врятує дані, якщо пристрій зникне.", "Показания переписываем с компьютера в тягаче: перед выездом с базы — Początek, после приезда — Koniec.": "Показники переписуємо з комп'ютера в тягачі: перед виїздом з бази — Początek, після приїзду — Koniec.", "Вписываем ВСЕ загрузки и ВСЕ выгрузки. При перецепке: получая груз — Załadunek, передавая — Wyładunek. Вес переписываем с CMR, при перецепе жмём PCA.": "Вписуємо ВСІ завантаження і ВСІ вивантаження. При перечіпці: отримуючи вантаж — Załadunek, передаючи — Wyładunek. Вагу переписуємо з CMR, при перечіпці тиснемо PCA.", "Заправку холодильника берём отдельным чеком, в Trimble вписываем как «paliwo», на чеке подписываем «chłodnia». Не суммируем — каждый бак отдельной строкой.": "Заправку холодильника беремо окремим чеком, у Trimble вписуємо як «paliwo», на чеку підписуємо «chłodnia». Не сумуємо — кожен бак окремим рядком.", "Только ON тягача — AdBlue и холодильник сюда не идут. Справа — сколько чеков.": "Тільки ON тягача — AdBlue і холодильник сюди не входять. Праворуч — скільки чеків.", "Каждая валюта считается отдельно — ничего не смешивается. Справа — сколько строк.": "Кожна валюта рахується окремо — нічого не змішується. Праворуч — скільки рядків.", "В Польше по карте фирмы (Visa / Mastercard) обязательно берём FAKTURA VAT. Нет чека — пишем oświadczenie.": "У Польщі за карткою фірми (Visa / Mastercard) обов'язково беремо FAKTURA VAT. Немає чека — пишемо oświadczenie.", "Пиши только название и, если нужно, 4 последние цифры — полный номер и PIN в приложение вносить не надо.": "Пиши лише назву і, якщо треба, 4 останні цифри — повний номер і PIN у застосунок вносити не треба.", "Подпись встанет на бланке над линией «Pierwszy kierowca» / «Drugi kierowca». Если оставить пусто — напечатается чистая линия, как в оригинале.": "Підпис стане на бланку над лінією «Pierwszy kierowca» / «Drugi kierowca». Якщо залишити порожнім — надрукується чиста лінія, як в оригіналі.", "Всё сохраняется прямо в телефоне — интернет не нужен. Кнопки «Сег.», «Сейч.» и «Сейчас» подставляют дату и время. Кнопка GPS определяет страну по координатам офлайн, а если есть сеть — подтягивает и город.": "Усе зберігається прямо в телефоні — інтернет не потрібен. Кнопки «Сьог.», «Зараз» підставляють дату й час. Кнопка GPS визначає країну за координатами офлайн, а якщо є мережа — підтягує і місто.", "Печать: «Печать / PDF» → в Safari выбираете принтер или «Сохранить в Файлы» (PDF). Бланк печатается 1-в-1 как оригинал.": "Друк: «Друк / PDF» → у Safari обираєте принтер або «Зберегти у Файли» (PDF). Бланк друкується 1-в-1 як оригінал.", "Чтобы открывалось в один тап: откройте файл в Safari → «Поделиться» → «На экран \"Домой\"».": "Щоб відкривалося одним дотиком: відкрийте файл у Safari → «Поділитися» → «На екран \"Додому\"».", "Карта создана": "Карту створено", "Карта добавлена": "Картку додано", "Карта загружена": "Карту завантажено", "Это единственная карта": "Це єдина карта", "Подсветка выключена": "Підсвічування вимкнено", "Пустые графы подсвечены": "Порожні графи підсвічено", "Копия сохранена в Загрузки": "Копію збережено в Завантаження", "Восстановлено": "Відновлено", "Не удалось восстановить": "Не вдалося відновити", "Файл не читается": "Файл не читається", "Дата и время подставлены": "Дату й час підставлено", "Добавлено": "Додано", "Подпись очищена": "Підпис очищено", "Сначала впиши литры первого чека": "Спочатку впиши літри першого чека", "Геолокация недоступна": "Геолокація недоступна", "Нет доступа к геолокации": "Немає доступу до геолокації", "Страна не определена": "Країну не визначено", "Удалить запись?": "Видалити запис?", "Восстановить состояние из копии? Текущие карты будут заменены.": "Відновити стан з копії? Поточні карти буде замінено.", "Название карты:": "Назва карти:", "Название новой карты:": "Назва нової карти:", "Название карты (можно с 4 последними цифрами):": "Назва картки (можна з 4 останніми цифрами):"}, pl: {"+ Ещё загрузка": "+ Kolejny załadunek", "+ Ещё выгрузка": "+ Kolejny wyładunek", "Готово": "Gotowe", "Править": "Edytuj", "Печать / PDF": "Wydruk / PDF", "Новая карта": "Nowa karta", "Переименовать": "Zmień nazwę", "Пустые": "Puste", "Пустые ✓": "Puste ✓", "Копия ⤴": "Kopia ⤴", "Экспорт": "Eksport", "Импорт": "Import", "Удалить": "Usuń", "Очистить": "Wyczyść", "Восстановить": "Przywróć", "Сделать": "Zrób", "Сейчас": "Teraz", "Сег.": "Dziś", "Сейч.": "Teraz", "Карта": "Karta", "Заправки": "Tankowania", "Расходы": "Koszty", "Инструкция": "Instrukcja", "Numer Wyjazdu — номер выезда": "Numer Wyjazdu", "Numer Teczki — номер папки": "Numer Teczki", "WYJAZD Z BAZY — начало работы": "WYJAZD Z BAZY — początek pracy", "POWRÓT NA BAZĘ — окончание работы": "POWRÓT NA BAZĘ — koniec pracy", "Bus — выезд с базы": "Bus — wyjazd z bazy", "Bus — возврат на базу": "Bus — powrót na bazę", "Wyjazd Busem z bazy — выезд с базы": "Wyjazd Busem z bazy", "Przyjazd Busem do samochodu — приезд к тягачу": "Przyjazd Busem do samochodu", "Powrót Busem do Bazy — выезд к базе": "Powrót Busem do Bazy", "Przyjazd Busem do bazy — приезд на базу": "Przyjazd Busem do bazy", "Stan licznika KM — километраж": "Stan licznika KM", "Stan Paliwa — топливо, %": "Stan Paliwa, %", "Załadunek — загрузка": "Załadunek", "Wyładunek — выгрузка": "Wyładunek", "Miejscowość (левая колонка)": "Miejscowość (lewa kolumna)", "Miejscowość (правая колонка)": "Miejscowość (prawa kolumna)", "Data / Godz. — ПОСЛЕ окончания загрузки": "Data / Godz. — PO zakończeniu załadunku", "Data / Godz. — ПОСЛЕ окончания выгрузки": "Data / Godz. — PO zakończeniu wyładunku", "Za co — за что": "Za co", "Podpisy — подписи": "Podpisy", "Pierwszy kierowca — расписаться пальцем": "Pierwszy kierowca — podpis palcem", "Drugi kierowca — расписаться пальцем": "Drugi kierowca — podpis palcem", "Примечания на бланк": "Uwagi na formularz", "Дорожная карта. Инструкция по выполнению": "Karta drogowa. Instrukcja wypełniania", "Резервные копии": "Kopie zapasowe", "Копии внутри устройства": "Kopie w urządzeniu", "Сохранить копию сейчас": "Zapisz kopię teraz", "Как это работает": "Jak to działa", "Итого по картам": "Razem wg kart", "Всего": "Razem", "Мои карты": "Moje karty", "Банковские": "Bankowe", "Топливные": "Paliwowe", "+ Добавить строку": "+ Dodaj wiersz", "+ Заправка ON": "+ Tankowanie ON", "+ Заправка AdBlue": "+ Tankowanie AdBlue", "+ Заправка холодильника": "+ Tankowanie chłodni", "+ Покупка": "+ Zakup", "+ Оплата": "+ Opłata", "+ Сервис": "+ Serwis", "+ Штраф": "+ Mandat", "+ Своя покупка": "+ Zakup własną kartą", "+ чек": "+ paragon", "+ добавить": "+ dodaj", "＋ Своя карта…": "＋ Własna karta…", "готово": "gotowe", "неполно": "niepełne", "пусто": "pusto", "нет загрузки": "brak załadunku", "нет выгрузки": "brak wyładunku", "подпись сохранена": "podpis zapisany", "пока нет": "jeszcze nie", "ни разу": "ani razu", "без карты": "bez karty", "своя карта / наличные": "własna karta / gotówka", "т / кг": "t / kg", "сохраняю…": "zapisuję…", "Пусто.": "Pusto.", "Пока нет.": "Jeszcze nie ma.", "Пока пусто. Добавьте первую загрузку.": "Na razie pusto. Dodaj pierwszy załadunek.", "Копия ещё ни разу не сохранялась.": "Kopia nie została jeszcze ani razu zapisana.", "Последняя копия — сегодня.": "Ostatnia kopia — dzisiaj.", "Эта страница всегда печатается 4-й — как в оригинальном комплекте.": "Ta strona zawsze drukuje się jako czwarta — jak w oryginalnym komplecie.", "Раз в сутки приложение само кладёт файл копии в Загрузки. Кнопка «Копия ⤴» вверху отправляет его в облако или мессенджер одним тапом — это единственное, что спасёт данные, если устройство пропадёт.": "Raz na dobę aplikacja sama zapisuje plik kopii w Pobranych. Przycisk «Kopia ⤴» u góry wysyła go do chmury lub komunikatora jednym dotknięciem — to jedyne, co uratuje dane, jeśli urządzenie zniknie.", "Показания переписываем с компьютера в тягаче: перед выездом с базы — Początek, после приезда — Koniec.": "Stany przepisujemy z komputera w ciągniku: przed wyjazdem z bazy — Początek, po przyjeździe — Koniec.", "Вписываем ВСЕ загрузки и ВСЕ выгрузки. При перецепке: получая груз — Załadunek, передавая — Wyładunek. Вес переписываем с CMR, при перецепе жмём PCA.": "Wpisujemy WSZYSTKIE załadunki i WSZYSTKIE wyładunki. Przy przeczepce: odbierając ładunek — Załadunek, przekazując — Wyładunek. Wagę przepisujemy z CMR, przy przeczepce naciskamy PCA.", "Заправку холодильника берём отдельным чеком, в Trimble вписываем как «paliwo», на чеке подписываем «chłodnia». Не суммируем — каждый бак отдельной строкой.": "Tankowanie chłodni bierzemy na osobny paragon, w Trimble wpisujemy jako «paliwo», na paragonie podpisujemy «chłodnia». Nie sumujemy — każdy zbiornik osobnym wierszem.", "Только ON тягача — AdBlue и холодильник сюда не идут. Справа — сколько чеков.": "Tylko ON ciągnika — AdBlue i chłodnia tu nie wchodzą. Po prawej — ile paragonów.", "Каждая валюта считается отдельно — ничего не смешивается. Справа — сколько строк.": "Każda waluta liczona jest osobno — nic się nie miesza. Po prawej — ile wierszy.", "В Польше по карте фирмы (Visa / Mastercard) обязательно берём FAKTURA VAT. Нет чека — пишем oświadczenie.": "W Polsce kartą firmową (Visa / Mastercard) obowiązkowo bierzemy FAKTURĘ VAT. Brak paragonu — piszemy oświadczenie.", "Пиши только название и, если нужно, 4 последние цифры — полный номер и PIN в приложение вносить не надо.": "Wpisuj tylko nazwę i w razie potrzeby 4 ostatnie cyfry — pełnego numeru i PIN-u nie wpisujemy do aplikacji.", "Подпись встанет на бланке над линией «Pierwszy kierowca» / «Drugi kierowca». Если оставить пусто — напечатается чистая линия, как в оригинале.": "Podpis stanie na formularzu nad linią «Pierwszy kierowca» / «Drugi kierowca». Jeśli zostawisz puste — wydrukuje się czysta linia, jak w oryginale.", "Всё сохраняется прямо в телефоне — интернет не нужен. Кнопки «Сег.», «Сейч.» и «Сейчас» подставляют дату и время. Кнопка GPS определяет страну по координатам офлайн, а если есть сеть — подтягивает и город.": "Wszystko zapisuje się bezpośrednio w telefonie — internet nie jest potrzebny. Przyciski «Dziś» i «Teraz» wstawiają datę i godzinę. Przycisk GPS ustala kraj z współrzędnych offline, a przy zasięgu podpowiada też miasto.", "Печать: «Печать / PDF» → в Safari выбираете принтер или «Сохранить в Файлы» (PDF). Бланк печатается 1-в-1 как оригинал.": "Wydruk: «Wydruk / PDF» → w Safari wybierasz drukarkę albo «Zapisz w Plikach» (PDF). Formularz drukuje się 1:1 jak oryginał.", "Чтобы открывалось в один тап: откройте файл в Safari → «Поделиться» → «На экран \"Домой\"».": "Aby otwierało się jednym dotknięciem: otwórz plik w Safari → «Udostępnij» → «Do ekranu początkowego».", "Карта создана": "Karta utworzona", "Карта добавлена": "Karta dodana", "Карта загружена": "Karta wczytana", "Это единственная карта": "To jedyna karta", "Подсветка выключена": "Podświetlenie wyłączone", "Пустые графы подсвечены": "Puste pola podświetlone", "Копия сохранена в Загрузки": "Kopia zapisana w Pobranych", "Восстановлено": "Przywrócono", "Не удалось восстановить": "Nie udało się przywrócić", "Файл не читается": "Nie można odczytać pliku", "Дата и время подставлены": "Data i godzina wstawione", "Добавлено": "Dodano", "Подпись очищена": "Podpis wyczyszczony", "Сначала впиши литры первого чека": "Najpierw wpisz litry z pierwszego paragonu", "Геолокация недоступна": "Geolokalizacja niedostępna", "Нет доступа к геолокации": "Brak dostępu do geolokalizacji", "Страна не определена": "Nie ustalono kraju", "Удалить запись?": "Usunąć wpis?", "Восстановить состояние из копии? Текущие карты будут заменены.": "Przywrócić stan z kopii? Bieżące karty zostaną zastąpione.", "Название карты:": "Nazwa karty:", "Название новой карты:": "Nazwa nowej karty:", "Название карты (можно с 4 последними цифрами):": "Nazwa karty (można z 4 ostatnimi cyframi):"} };
 const IPAT = { ua: [[new RegExp("^Последняя копия — (\\d+) дн\\. назад\\.$"),"Остання копія — $1 дн. тому."],[new RegExp("^Строка (\\d+)$"),"Рядок $1"],[new RegExp("^(\\d+) / (\\d+) строк на бланке$"),"$1 / $2 рядків на бланку"],[new RegExp("^сохранено (.+)$"),"збережено $1"],[new RegExp("^Удалить «(.+)»\\? Данные пропадут\\.$"),"Видалити «$1»? Дані зникнуть."],[new RegExp("^Убрать «(.+)» из списка\\? В уже заполненных строках она останется\\.$"),"Прибрати «$1» зі списку? У вже заповнених рядках вона залишиться."],[new RegExp("^Копии карты нет (.+)\\. Если планшет пропадёт — данные пропадут вместе с ним\\.$"),"Копії карти немає $1. Якщо планшет зникне — дані зникнуть разом з ним."],[new RegExp("^уже (\\d+) дн\\.$"),"уже $1 дн."]], pl: [[new RegExp("^Последняя копия — (\\d+) дн\\. назад\\.$"),"Ostatnia kopia — $1 dni temu."],[new RegExp("^Строка (\\d+)$"),"Wiersz $1"],[new RegExp("^(\\d+) / (\\d+) строк на бланке$"),"$1 / $2 wierszy na formularzu"],[new RegExp("^сохранено (.+)$"),"zapisano $1"],[new RegExp("^Удалить «(.+)»\\? Данные пропадут\\.$"),"Usunąć «$1»? Dane przepadną."],[new RegExp("^Убрать «(.+)» из списка\\? В уже заполненных строках она останется\\.$"),"Usunąć «$1» z listy? W już wypełnionych wierszach pozostanie."],[new RegExp("^Копии карты нет (.+)\\. Если планшет пропадёт — данные пропадут вместе с ним\\.$"),"Nie ma kopii karty $1. Jeśli tablet zniknie — dane znikną razem z nim."],[new RegExp("^уже (\\d+) дн\\.$"),"już $1 dni"]] };
-/* --- строки экрана «Итоги» --- */
+
+
+/* v36 — новые строки интерфейса */
+I18N.ua["Карта создана, подпись перенесена"] = "Карту створено, підпис перенесено";
+I18N.pl["Карта создана, подпись перенесена"] = "Karta utworzona, podpis przeniesiony";/* --- строки экрана «Итоги» --- */
 (function(){
   const ADD = {
     ua: {"Итоги":"Підсумки","Итоги месяца":"Підсумки місяця","Ночная работа · окно 22:00–05:00":"Нічна робота · вікно 22:00–05:00",
@@ -701,7 +724,7 @@ function initSigs(){
       const p = pos(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p;
     });
     const end = ()=>{ if(!drawing) return; drawing=false;
-      setP(C, path, cv.toDataURL("image/png")); save(); };
+      setP(C, path, cv.toDataURL("image/png")); rememberSig(); save(); };
     cv.addEventListener("pointerup", end);
     cv.addEventListener("pointercancel", end);
     cv.addEventListener("pointerleave", end);
@@ -1638,11 +1661,25 @@ function fitPages(){
   document.querySelectorAll("#print .sheet").forEach(sh=>{
     sh.style.zoom = 1;
     sh.style.width = BOX_W + "px";
+
+    /* Замер настоящей высоты содержимого.
+       У .sheet стоит overflow:hidden + display:flex — в этом сочетании WebKit
+       (Safari на iPhone/iPad) возвращает scrollHeight, равный высоте бокса,
+       а не содержимого. Из-за этого масштаб выходил = 1, и нижние строки
+       ТRASA обрезались посреди строки, без нижней линии.
+       Поэтому на время замера снимаем ограничения по высоте. */
+    const oldOv = sh.style.overflow;
+    sh.style.overflow = "visible";
+    sh.style.minHeight = "0px";
+    sh.style.height = "auto";
+    const H = Math.ceil(sh.getBoundingClientRect().height);
+    sh.style.overflow = oldOv;
+    sh.style.height = "";
     sh.style.minHeight = BOX_H + "px";
-    const H = sh.scrollHeight;
+
     let s = H > 0 ? Math.min(1, BOX_H / H) : 1;
     if(s < 1){
-      s = s * 0.98;
+      s = s * 0.985;                       // запас, чтобы нижняя линия точно попала на лист
       sh.style.width = (BOX_W / s) + "px";
       sh.style.minHeight = (BOX_H / s) + "px";
       sh.style.zoom = s;
@@ -1851,7 +1888,7 @@ document.addEventListener("click", async e=>{
   if(t.dataset.snap !== undefined){ restoreSnap(+t.dataset.snap); return; }
 
   if(t.dataset.sigclear){
-    setP(C, t.dataset.sigclear, ""); save(); renderMain(); toast("Подпись очищена"); return;
+    setP(C, t.dataset.sigclear, ""); rememberSig(); save(); renderMain(); toast("Подпись очищена"); return;
   }
 
   if(t.dataset.addz){
@@ -1925,7 +1962,11 @@ document.addEventListener("click", async e=>{
       if(buildItogiPrint()) setTimeout(()=>window.print(),120); else PRINT_MODE = "card";
       break;
     case "btnNew": { const n = prompt(T("Название новой карты:"), "Karta " + new Date().toLocaleDateString("ru-RU"));
-      if(n===null) return; const c = newCard(n.trim()); DB.cards.push(c); DB.active=c.id; C=c; save(true); renderAll(); toast("Карта создана"); break; }
+      if(n===null) return;
+      const sg = lastSig();
+      const c = newCard(n.trim(), sg);
+      DB.cards.push(c); DB.active=c.id; C=c; save(true); renderAll();
+      toast(sg ? "Карта создана, подпись перенесена" : "Карта создана"); break; }
     case "btnRename": { const n = prompt(T("Название карты:"), C.name); if(n===null) return; C.name=n.trim()||C.name; save(true); renderCards(); break; }
     case "btnDel": { if(DB.cards.length<2){ toast("Это единственная карта"); return; }
       if(!confirm(T(`Удалить «${C.name}»? Данные пропадут.`))) return;
