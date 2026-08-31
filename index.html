@@ -145,9 +145,9 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
 
 /* ================= PRINT SHEET (точная копия бланка) ================= */
 #print{position:absolute;left:-99999px;top:0;width:680px;background:#fff;color:#000}
-.page{width:680px;height:975px;overflow:hidden;background:#fff;margin:0 auto 10px}
+.page{width:680px;height:880px;overflow:hidden;background:#fff;margin:0 auto 10px}
 .sheet{
-  width:680px;min-height:975px;background:#fff;
+  width:680px;min-height:880px;background:#fff;
   font-family:"Times New Roman",Times,serif;color:#000;
   display:flex;flex-direction:column;overflow:hidden;
 }
@@ -257,7 +257,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v37</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v38</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -369,6 +369,21 @@ function lastSig(){
   }catch(e){}
   return null;
 }
+/* Подпись конкретного водителя (k1/k2) с других карт — для кнопки
+   «С прошлой карты». Ищем от самой свежей к старым, текущую пропускаем. */
+function prevSig(which){
+  try{
+    if(DB && DB.lastSig && DB.lastSig[which]) return DB.lastSig[which];
+    const list = (DB && DB.cards) || [];
+    for(let i = list.length - 1; i >= 0; i--){
+      const c = list[i];
+      if(!c || (C && c.id === C.id)) continue;
+      if(c.sig && c.sig[which]) return c.sig[which];
+    }
+  }catch(e){}
+  return "";
+}
+
 function rememberSig(){
   try{ if(C && C.sig) DB.lastSig = {k1: C.sig.k1 || "", k2: C.sig.k2 || ""}; }catch(e){}
 }
@@ -421,7 +436,13 @@ const IPAT = { ua: [[new RegExp("^Последняя копия — (\\d+) дн\
 
 /* v36 — новые строки интерфейса */
 I18N.ua["Карта создана, подпись перенесена"] = "Карту створено, підпис перенесено";
-I18N.pl["Карта создана, подпись перенесена"] = "Karta utworzona, podpis przeniesiony";/* --- строки экрана «Итоги» --- */
+I18N.pl["Карта создана, подпись перенесена"] = "Karta utworzona, podpis przeniesiony";
+I18N.ua["С прошлой карты"] = "З минулої карти";
+I18N.pl["С прошлой карты"] = "Z poprzedniej karty";
+I18N.ua["Подпись перенесена"] = "Підпис перенесено";
+I18N.pl["Подпись перенесена"] = "Podpis przeniesiony";
+I18N.ua["Нечего переносить"] = "Нічого переносити";
+I18N.pl["Нечего переносить"] = "Nie ma czego przenosić";/* --- строки экрана «Итоги» --- */
 (function(){
   const ADD = {
     ua: {"Итоги":"Підсумки","Итоги месяца":"Підсумки місяця","Ночная работа · окно 22:00–05:00":"Нічна робота · вікно 22:00–05:00",
@@ -687,12 +708,14 @@ function renderMain(){
       <label class="f"><span>Pierwszy kierowca — расписаться пальцем</span></label>
       <canvas class="sigpad" data-sig="sig.k1"></canvas>
       <div class="sigrow"><button class="mini" data-sigclear="sig.k1">Очистить</button>
+        ${prevSig("k1") ? '<button class="mini" data-sigcopy="sig.k1">С прошлой карты</button>' : ""}
         <span class="hint" style="margin:0">${C.sig.k1?"подпись сохранена":"пусто"}</span></div>
     </div>
     <div class="sigwrap">
       <label class="f"><span>Drugi kierowca — расписаться пальцем</span></label>
       <canvas class="sigpad" data-sig="sig.k2"></canvas>
       <div class="sigrow"><button class="mini" data-sigclear="sig.k2">Очистить</button>
+        ${prevSig("k2") ? '<button class="mini" data-sigcopy="sig.k2">С прошлой карты</button>' : ""}
         <span class="hint" style="margin:0">${C.sig.k2?"подпись сохранена":"пусто"}</span></div>
     </div>
     <p class="hint">Подпись встанет на бланке над линией «Pierwszy kierowca» / «Drugi kierowca». Если оставить пусто — напечатается чистая линия, как в оригинале.</p>
@@ -1657,10 +1680,12 @@ function buildPrint(){
 
 /* Каждый лист ужимается ровно под один A4, чтобы всегда было 4 страницы.
 
-   Лист 680×975 px ≈ 180×258 мм — это вся полезная площадь A4 при полях 12 мм.
-   Раньше бокс был 880 px (233 мм): содержимое листа 1 в него не влезало,
-   а `.page{overflow:hidden}` молча срезал последние строки TRASA.            */
-const BOX_W = 680, BOX_H = 975;
+   680×880 px — проверенный размер: именно столько реально влезает в область
+   печати Safari на iPhone. Больше делать нельзя — пробовали 975, и каждый лист
+   уезжал на две физические страницы (получилось 8 вместо 4).
+   Значит содержимое, которое не влезает (лист 1 с 30 строками TRASA ≈ 955 px),
+   нужно не обрезать, а ужимать — этим и занимается fitPages ниже.            */
+const BOX_W = 680, BOX_H = 880;
 
 /* Настоящая высота содержимого листа.
    scrollHeight у .sheet врёт: там overflow:hidden + display:flex, и WebKit
@@ -1680,11 +1705,35 @@ function sheetContentH(sh){
 
 function fitPages(){
   document.querySelectorAll("#print .sheet").forEach(sh=>{
-    sh.style.zoom = "";                 // старый механизм больше не используем
+    sh.style.zoom = "";
+    sh.style.transform = "none";
     sh.style.transformOrigin = "0 0";
+    sh.style.width = BOX_W + "px";
+    sh.style.minHeight = BOX_H + "px";
+
+    /* Шаг 1 — настоящая вёрстка, а не масштаб.
+       Высота строки TRASA задана содержимым: «01.08.26 / 00:01» встаёт
+       в две строки, и одной высотой в мм её не сжать — нужно шевелить шрифт. */
+    const tr = sh.querySelector("table.trasa");
+    if(tr && sheetContentH(sh) > BOX_H){
+      let st = sh.querySelector("style[data-fit]");
+      if(!st){ st = document.createElement("style"); st.setAttribute("data-fit",""); sh.appendChild(st); }
+      let fs = 7.5, lh = 1.15, hh = 5.1;
+      for(let i = 0; i < 16; i++){
+        fs = Math.max(5.4, fs - 0.14);
+        lh = Math.max(1.0, lh - 0.012);
+        hh = Math.max(3.2, hh - 0.13);
+        st.textContent = ".trasa td,.trasa th,.trasa .val{font-size:" + fs.toFixed(2) +
+                         "pt;line-height:" + lh.toFixed(3) + "}.trasa td{height:" + hh.toFixed(2) + "mm}";
+        if(sheetContentH(sh) <= BOX_H) break;
+      }
+    }
+
+    /* Шаг 2 — если всё равно не влезло, ужимаем лист целиком.
+       transform, а не zoom: zoom — легаси WebKit, в печати Safari срабатывает не всегда. */
     let s = 1;
     for(let pass = 0; pass < 6; pass++){
-      sh.style.transform = "none";      // мерить только без масштаба
+      sh.style.transform = "none";
       sh.style.width = (BOX_W / s) + "px";
       sh.style.minHeight = (BOX_H / s) + "px";
       const H = sheetContentH(sh), fits = BOX_H / s;
@@ -1694,8 +1743,6 @@ function fitPages(){
     }
     sh.style.width = (BOX_W / s) + "px";
     sh.style.minHeight = (BOX_H / s) + "px";
-    /* transform, а не zoom: zoom — легаси WebKit и в печати Safari срабатывает
-       не всегда, из-за чего лист уходил на печать неуменьшенным. */
     sh.style.transform = s < 1 ? ("scale(" + s + ")") : "none";
   });
 }
@@ -1902,6 +1949,12 @@ document.addEventListener("click", async e=>{
 
   if(t.dataset.sigclear){
     setP(C, t.dataset.sigclear, ""); rememberSig(); save(); renderMain(); toast("Подпись очищена"); return;
+  }
+  if(t.dataset.sigcopy){
+    const which = t.dataset.sigcopy.split(".")[1];
+    const img = prevSig(which);
+    if(!img){ toast("Нечего переносить"); return; }
+    setP(C, t.dataset.sigcopy, img); rememberSig(); save(true); renderMain(); toast("Подпись перенесена"); return;
   }
 
   if(t.dataset.addz){
