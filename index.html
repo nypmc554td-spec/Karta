@@ -145,9 +145,9 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
 
 /* ================= PRINT SHEET (точная копия бланка) ================= */
 #print{position:absolute;left:-99999px;top:0;width:680px;background:#fff;color:#000}
-.page{width:680px;height:880px;overflow:hidden;background:#fff;margin:0 auto 10px}
+.page{width:680px;height:975px;overflow:hidden;background:#fff;margin:0 auto 10px}
 .sheet{
-  width:680px;min-height:880px;background:#fff;
+  width:680px;min-height:975px;background:#fff;
   font-family:"Times New Roman",Times,serif;color:#000;
   display:flex;flex-direction:column;overflow:hidden;
 }
@@ -257,7 +257,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v36</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v37</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1655,35 +1655,48 @@ function buildPrint(){
   fitCells();
 }
 
-/* Каждый лист ужимается ровно под один A4, чтобы всегда было 4 страницы */
-const BOX_W = 680, BOX_H = 880;
+/* Каждый лист ужимается ровно под один A4, чтобы всегда было 4 страницы.
+
+   Лист 680×975 px ≈ 180×258 мм — это вся полезная площадь A4 при полях 12 мм.
+   Раньше бокс был 880 px (233 мм): содержимое листа 1 в него не влезало,
+   а `.page{overflow:hidden}` молча срезал последние строки TRASA.            */
+const BOX_W = 680, BOX_H = 975;
+
+/* Настоящая высота содержимого листа.
+   scrollHeight у .sheet врёт: там overflow:hidden + display:flex, и WebKit
+   (Safari на iPhone) возвращает высоту бокса, а не содержимого. Поэтому
+   считаем по нижней границе самих детей — overflow обрезает только рисование,
+   на раскладку и getBoundingClientRect он не влияет. */
+function sheetContentH(sh){
+  const top = sh.getBoundingClientRect().top;
+  let bottom = top;
+  for(let i = 0; i < sh.children.length; i++){
+    const r = sh.children[i].getBoundingClientRect();
+    if(r.height || r.width) bottom = Math.max(bottom, r.bottom);
+  }
+  const pb = parseFloat(getComputedStyle(sh).paddingBottom) || 0;
+  return Math.max(sh.scrollHeight, Math.ceil(bottom - top + pb));
+}
+
 function fitPages(){
   document.querySelectorAll("#print .sheet").forEach(sh=>{
-    sh.style.zoom = 1;
-    sh.style.width = BOX_W + "px";
-
-    /* Замер настоящей высоты содержимого.
-       У .sheet стоит overflow:hidden + display:flex — в этом сочетании WebKit
-       (Safari на iPhone/iPad) возвращает scrollHeight, равный высоте бокса,
-       а не содержимого. Из-за этого масштаб выходил = 1, и нижние строки
-       ТRASA обрезались посреди строки, без нижней линии.
-       Поэтому на время замера снимаем ограничения по высоте. */
-    const oldOv = sh.style.overflow;
-    sh.style.overflow = "visible";
-    sh.style.minHeight = "0px";
-    sh.style.height = "auto";
-    const H = Math.ceil(sh.getBoundingClientRect().height);
-    sh.style.overflow = oldOv;
-    sh.style.height = "";
-    sh.style.minHeight = BOX_H + "px";
-
-    let s = H > 0 ? Math.min(1, BOX_H / H) : 1;
-    if(s < 1){
-      s = s * 0.985;                       // запас, чтобы нижняя линия точно попала на лист
+    sh.style.zoom = "";                 // старый механизм больше не используем
+    sh.style.transformOrigin = "0 0";
+    let s = 1;
+    for(let pass = 0; pass < 6; pass++){
+      sh.style.transform = "none";      // мерить только без масштаба
       sh.style.width = (BOX_W / s) + "px";
       sh.style.minHeight = (BOX_H / s) + "px";
-      sh.style.zoom = s;
+      const H = sheetContentH(sh), fits = BOX_H / s;
+      if(H <= fits + 0.5) break;
+      s = s * (fits / H) * 0.995;
+      if(s < 0.55){ s = 0.55; break; }
     }
+    sh.style.width = (BOX_W / s) + "px";
+    sh.style.minHeight = (BOX_H / s) + "px";
+    /* transform, а не zoom: zoom — легаси WebKit и в печати Safari срабатывает
+       не всегда, из-за чего лист уходил на печать неуменьшенным. */
+    sh.style.transform = s < 1 ? ("scale(" + s + ")") : "none";
   });
 }
 
