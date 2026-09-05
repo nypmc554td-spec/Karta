@@ -296,7 +296,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v43</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v44</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1062,49 +1062,9 @@ function dkey(dt){
   return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
 }
 function dshort(k){ const a = k.split("-"); return a[2] + "." + a[1]; }
-/* --- километры по дням ---------------------------------------------------
-   Точки: показания счётчика с датой — Stany Samochodu (начало/конец) и графа
-   kilometraż в каждой загрузке/выгрузке. Пробег между двумя показаниями
-   раскладывается по дням пропорционально времени между ними. */
-function kmPoints(){
-  const pts = [];
-  const b = C.baza || {}, st = C.stany || {};
-  const kmP = nnum(st.kmP), kmK = nnum(st.kmK);
-  const t0 = dtOf(b.wyjD, b.wyjG || "00:00"), t1 = dtOf(b.powrD, b.powrG || "23:59");
-  if(kmP != null && t0) pts.push({t:t0, v:kmP});
-  trasaLines().forEach(function(r){
-    const a = dtOf(r.zd, r.zg), zl = nnum(r.zl);
-    if(a && zl != null) pts.push({t:a, v:zl});
-    const c = dtOf(r.wd, r.wg), wl = nnum(r.wl);
-    if(c && wl != null) pts.push({t:c, v:wl});
-  });
-  if(kmK != null && t1) pts.push({t:t1, v:kmK});
-  pts.sort(function(x, y){ return (x.t - y.t) || (x.v - y.v); });
-  return pts;
-}
-function kmByDay(){
-  const pts = kmPoints(), map = {};
-  for(let i = 1; i < pts.length; i++){
-    const a = pts[i - 1], b = pts[i];
-    const dv = b.v - a.v;
-    if(dv <= 0 || dv > 5000) continue;
-    const ms = b.t - a.t;
-    if(ms <= 0){ const k = dkey(b.t); map[k] = (map[k] || 0) + dv; continue; }
-    let cur = new Date(a.t.getTime()), guard = 0;
-    while(cur < b.t && guard++ < 60){
-      const dayEnd = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
-      const to = Math.min(dayEnd.getTime(), b.t.getTime());
-      const k = dkey(cur);
-      map[k] = (map[k] || 0) + dv * (to - cur.getTime()) / ms;
-      cur = new Date(to);
-    }
-  }
-  return map;
-}
-
 function itogi(){
   const o = {km:0, loaded:0, empty:0, emptyPct:null, orders:0, pca:0, weight:0, weighed:0,
-             countries:[], days:[], kmDays:0, kmAvg:0, kmMax:0, kmMaxDay:"", kmSpread:0,
+             countries:[], dayCount:0, kmAvg:0,
              litres:0, segs:[], fuel:null, fuelSrc:"", spread:null,
              odo:null, from:"", to:"", flags:[]};
   const L = trasaLines();
@@ -1146,18 +1106,14 @@ function itogi(){
 
   if(dmin && dmax){
     o.from = dkey(dmin); o.to = dkey(dmax);
-    const kmap = kmByDay();
-    let d = new Date(dmin.getFullYear(), dmin.getMonth(), dmin.getDate()), guard = 0;
-    while(d <= dmax && guard++ < 45){
-      const k = dkey(d);
-      o.days.push({k:k, km:Math.round(kmap[k] || 0)});
-      d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
-    }
-    o.days.forEach(function(x){
-      if(x.km > 0){ o.kmDays++; o.kmSpread += x.km; }
-      if(x.km > o.kmMax){ o.kmMax = x.km; o.kmMaxDay = x.k; }
-    });
-    o.kmAvg = o.kmDays ? Math.round(o.kmSpread / o.kmDays) : 0;
+    /* дни рейса: от выезда с базы до возврата, если они вписаны, иначе от первой до последней записи */
+    const b = C.baza || {};
+    const a0 = dtOf(b.wyjD, b.wyjG || "00:00") || dmin;
+    const a1 = dtOf(b.powrD, b.powrG || "23:59") || dmax;
+    const d0 = new Date(a0.getFullYear(), a0.getMonth(), a0.getDate());
+    const d1 = new Date(a1.getFullYear(), a1.getMonth(), a1.getDate());
+    o.dayCount = Math.max(1, Math.round((d1 - d0) / 86400000) + 1);
+    if(o.km > 0) o.kmAvg = Math.round(o.km / o.dayCount);
   }
 
   /* --- топливо: только ON тягача --- */
@@ -1223,29 +1179,6 @@ function loadLevel(o){
 }
 
 /* --- графика: SVG, чтобы печаталась и без фоновой заливки --- */
-function kmSvg(o, nums){
-  const d = o.days.length ? o.days : [{k:"", km:0}];
-  const W = 320, TOP = nums ? 66 : 58, gap = d.length > 1 ? 1.4 : 0;
-  const bw = (W - gap * (d.length - 1)) / d.length;
-  const xOf = function(i){ return i * (bw + gap); };
-  const mx = Math.max(1, o.kmMax);
-  let bars = "", ticks = "";
-  d.forEach(function(x, i){
-    const hh = x.km <= 0 ? 1.6 : Math.max(2.5, x.km / mx * TOP);
-    const cls = x.km <= 0 ? "nb-zero" : (x.k === o.kmMaxDay ? "nb-full" : "nb-part");
-    bars += '<rect class="' + cls + '" x="' + xOf(i).toFixed(2) + '" y="' + (TOP - hh).toFixed(2) +
-            '" width="' + bw.toFixed(2) + '" height="' + hh.toFixed(2) + '"/>';
-    /* на листе для офиса цифры ставим только над самым большим днём — иначе не читаются */
-    if(nums && x.k === o.kmMaxDay && x.km > 0)
-      bars += '<text class="nnum" x="' + (xOf(i) + bw / 2).toFixed(2) + '" y="' +
-              Math.max(6, TOP - hh - 1.8).toFixed(2) + '" text-anchor="middle">' + x.km + '</text>';
-    const day = parseInt(String(x.k).slice(8), 10);
-    if(day === 1 || day % 5 === 0)
-      ticks += '<text class="nt" x="' + (xOf(i) + bw / 2).toFixed(2) + '" y="' + (TOP + 14) + '" text-anchor="middle">' + day + '</text>';
-  });
-  return '<svg class="chart nchart" viewBox="0 0 ' + W + ' ' + (TOP + 20) + '" role="img">' +
-         bars + '<rect class="ax" x="0" y="' + TOP + '" width="' + W + '" height="0.7"/>' + ticks + '</svg>';
-}
 function scaleSvg(val, lo, hi, mark, band){
   const W = 320, H = 17;
   const px = function(v){ return Math.max(0, Math.min(1, (v - lo) / (hi - lo))) * W; };
@@ -1289,70 +1222,6 @@ function krajName(k){
 function n1(v){ return (Math.round(v * 10) / 10).toFixed(1).replace(".", ","); }
 function nkm(v){ return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
 
-/* --- KPI: показатели против отраслевых норм + общий балл 0–100 -------------
-   Расход ON: коридор 25–33 л/100 км для еврофуры 40 т.
-   Порожние пробеги: Eurostat 2024 (road_go_ta_tott) — в международных
-   перевозках ЕС порожними выполнено 12,6 % км, по всем перевозкам 21,6 %.
-   Документы, штрафы, пробег — норма фирмы: ноль замечаний, ноль штрафов,
-   10 000 км международного пробега в месяц. */
-const KM_NORM = 10000, KM_LO = 6000, KM_HI = 11500;
-/* баллы за расход: 100 при 27 л/100 и ниже, 0 при 34 — коридор 25–33 остаётся нормой на шкале */
-const FUEL_SC_GOOD = 27, FUEL_SC_BAD = 34;
-const EMPTY_HI = 25, EMPTY_LO = 6;
-function clamp01(x){ return x < 0 ? 0 : (x > 1 ? 1 : x); }
-function kpiList(o){
-  const it = [];
-  if(o.fuel != null)
-    it.push({n:LX("Расход ON","Витрата ON","Spalanie ON"),
-             v:n1(o.fuel) + " " + LX("л/100 км","л/100 км","l/100 km"),
-             norm:"≤ " + FUEL_HI, w:30,
-             s:clamp01((FUEL_SC_BAD - o.fuel) / (FUEL_SC_BAD - FUEL_SC_GOOD)) * 100});
-  if(o.emptyPct != null)
-    it.push({n:LX("Порожние пробеги","Порожні пробіги","Puste przebiegi"),
-             v:n1(o.emptyPct) + " %",
-             norm:"≤ " + String(NORM_EMPTY).replace(".", ",") + " %", w:20,
-             s:clamp01((EMPTY_HI - o.emptyPct) / (EMPTY_HI - EMPTY_LO)) * 100});
-  const bad = o.flags.filter(function(f){ return f.t === "bad"; }).length;
-  const warn = o.flags.filter(function(f){ return f.t === "warn"; }).length;
-  it.push({n:LX("Документы","Документи","Dokumenty"),
-           v:(bad + warn) ? (bad + warn) + " " + LX("замеч.","заув.","uwag") : LX("чисто","чисто","czysto"),
-           norm:"0", w:25,
-           s:Math.max(0, 100 - bad * 35 - warn * 12)});
-  const mand = (C.mandaty || []).filter(function(r){ return r.co || r.kwota; }).length;
-  it.push({n:LX("Штрафы","Штрафи","Mandaty"), v:String(mand), norm:"0", w:15,
-           s:Math.max(0, 100 - mand * 35)});
-  if(o.km > 0)
-    it.push({n:LX("Пробег за месяц","Пробіг за місяць","Przebieg miesięczny"),
-             v:nkm(o.km) + " " + LX("км","км","km"),
-             norm:"≥ " + nkm(KM_NORM), w:10,
-             s:clamp01((o.km - KM_LO) / (KM_HI - KM_LO)) * 100});
-  return it;
-}
-function kpiScore(it){
-  let sw = 0, sv = 0;
-  it.forEach(function(x){ sw += x.w; sv += x.s * x.w; });
-  return sw ? Math.round(sv / sw) : 0;
-}
-function KPI_SHEET_CLS(s){ return s >= 75 ? "lv-lo" : (s >= 50 ? "lv-md" : "lv-hi"); }
-function kpiCls(s){ return s >= 75 ? "ok" : (s >= 50 ? "warn" : "bad"); }
-function kpiTxt(s){
-  return s >= 85 ? LX("Отлично","Відмінно","Bardzo dobrze")
-       : s >= 70 ? LX("Хорошо","Добре","Dobrze")
-       : s >= 55 ? LX("Нормально","Нормально","Poprawnie")
-                 : LX("Есть куда расти","Є куди рости","Jest co poprawić");
-}
-const KPI_COL = {ok:"#3E8E5A", warn:"#C79A2E", bad:"#C6402A"};
-function kpiRow(x){
-  const c = KPI_COL[kpiCls(x.s)];
-  return '<div style="margin-top:9px">' +
-    '<div style="display:flex;justify-content:space-between;font-size:13px">' +
-      '<span>' + x.n + '</span>' +
-      '<b>' + x.v + ' <i style="font-style:normal;font-weight:400;color:var(--dim)">' + LX("норма","норма","norma") + ' ' + x.norm + '</i></b>' +
-    '</div>' +
-    '<div style="height:6px;border-radius:3px;background:#E7E9EC;margin-top:4px;overflow:hidden">' +
-      '<div style="height:6px;width:' + Math.round(x.s) + '%;background:' + c + '"></div></div></div>';
-}
-
 function renderItogi(){
   const o = itogi();
   if(!o.orders && !o.litres){
@@ -1366,35 +1235,6 @@ function renderItogi(){
   const OF = LX("из","з","z");
   const btn = '<button class="btn primary" id="btnItogiPrint" style="width:100%;margin:10px 0 0">' +
     LX("Лист для офиса","Аркуш для офісу","Arkusz dla biura") + '</button>';
-
-  const kl = kpiList(o), ks = kpiScore(kl);
-  const kpiCard = '<div class="card"><h3>KPI · ' + LX("оценка месяца","оцінка місяця","ocena miesiąca") + '</h3>' +
-    '<div class="sum-big" style="color:' + KPI_COL[kpiCls(ks)] + '">' + ks + ' <span style="font-size:14px;color:var(--dim);font-weight:400">/ 100 · ' + kpiTxt(ks) + '</span></div>' +
-    kl.map(kpiRow).join("") +
-    '<p class="hint">' + LX("Расход: коридор 25–33 л/100 км для еврофуры 40 т. Порожние: Eurostat 2024, в международных перевозках ЕС 12,6 % км порожняком (по всем перевозкам 21,6 %). Документы, штрафы и пробег — норма фирмы. 100 баллов за расход — 27 л/100 км и ниже, 0 — от 34. Вес показателей: расход 30, документы 25, порожняк 20, штрафы 15, пробег 10.",
-        "Витрата: коридор 25–33 л/100 км для єврофури 40 т. Порожні: Eurostat 2024, у міжнародних перевезеннях ЄС 12,6 % км порожняком (за всіма перевезеннями 21,6 %). Документи, штрафи і пробіг — норма фірми. 100 балів за витрату — 27 л/100 км і нижче, 0 — від 34. Вага показників: витрата 30, документи 25, порожняк 20, штрафи 15, пробіг 10.",
-        "Spalanie: przedział 25–33 l/100 km dla zestawu 40 t. Puste przebiegi: Eurostat 2024, w transporcie międzynarodowym UE 12,6 % km na pusto (dla całości 21,6 %). Dokumenty, mandaty i przebieg — norma firmy. 100 pkt za spalanie — 27 l/100 km i mniej, 0 — od 34. Wagi: spalanie 30, dokumenty 25, puste 20, mandaty 15, przebieg 10.") + '</p></div>';
-
-  const kmday = '<div class="card"><h3>' + LX("Километры по дням","Кілометри по днях","Kilometry wg dni") + '</h3>' +
-    '<div class="sum-grid">' +
-      '<div class="sum-cell"><span>' + LX("Всего","Разом","Łącznie") + '</span><b>' + nkm(o.km) + ' ' + KM + '</b></div>' +
-      '<div class="sum-cell"><span>' + LX("Дней в движении","Днів у русі","Dni w ruchu") + '</span><b>' + o.kmDays +
-        ' <i style="font-style:normal;font-size:13px;color:var(--dim)">' + OF + ' ' + o.days.length + '</i></b></div>' +
-      '<div class="sum-cell"><span>' + LX("В среднем за день","У середньому за день","Średnio na dzień") + '</span><b>' + nkm(o.kmAvg) + ' ' + KM + '</b></div>' +
-      '<div class="sum-cell"><span>' + LX("Лучший день","Найкращий день","Najlepszy dzień") + '</span><b>' + nkm(o.kmMax) + ' ' + KM +
-        (o.kmMaxDay ? ' <i style="font-style:normal;font-size:13px;color:var(--dim)">' + dshort(o.kmMaxDay) + '</i>' : '') + '</b></div>' +
-    '</div>' +
-    '<div style="margin-top:12px">' + kmSvg(o) + '</div>' +
-    '<div class="sum-note" style="margin-top:4px">' +
-      '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#C6402A;vertical-align:-1px;margin-right:4px"></span>' +
-      LX("лучший день","найкращий день","najlepszy dzień") + '&nbsp;&nbsp;' +
-      '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#8A6BC4;vertical-align:-1px;margin-right:4px"></span>' +
-      LX("в движении","у русі","w ruchu") + '&nbsp;&nbsp;' +
-      '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#D3D6DB;vertical-align:-1px;margin-right:4px"></span>' +
-      LX("стоянка","стоянка","postój") + '</div>' +
-    '<p class="hint">' + LX("Берутся показания счётчика с датой: Stany Samochodu и графа kilometraż в каждой загрузке и выгрузке. Пробег между двумя показаниями раскладывается по дням пропорционально времени.",
-        "Беруться показання лічильника з датою: Stany Samochodu і графа kilometraż у кожному завантаженні та вивантаженні. Пробіг між двома показаннями розкладається по днях пропорційно часу.",
-        "Brane są stany licznika z datą: Stany Samochodu i kilometraż przy każdym załadunku i wyładunku. Przebieg między dwoma stanami rozkładany jest na dni proporcjonalnie do czasu.") + '</p></div>';
 
   const fuel = '<div class="card"><h3>' + LX("Расход ON","Витрата ON","Spalanie ON") + '</h3>' +
     (o.fuel != null
@@ -1450,9 +1290,11 @@ function renderItogi(){
     '<div class="sum-big">' + esc(LVL_TXT(lvl)) + '</div>' +
     '<p class="sum-note" style="margin:6px 0 0">' + LX("Пробег","Пробіг","Przebieg") + ' ' + nkm(o.km) + ' ' + KM + ' · ' +
       LX("заказов","замовлень","zlecenia") + ' ' + o.orders +
-      (o.countries.length ? ' · ' + LX("стран","країн","kraje") + ' ' + o.countries.length : '') + '.</p></div>';
+      (o.countries.length ? ' · ' + LX("стран","країн","kraje") + ' ' + o.countries.length : '') +
+      (o.kmAvg ? ' · ' + LX("в среднем","у середньому","średnio") + ' ' + nkm(o.kmAvg) + ' ' + KM + LX("/день","/день","/dzień") +
+        ' ' + OF + ' ' + o.dayCount + ' ' + LX("дней","днів","dni") : '') + '.</p></div>';
 
-  $("#pane-itogi").innerHTML = btn + kpiCard + kmday + fuel + vol + flags + end + btn.replace('margin:10px 0 0', 'margin:14px 0 0');
+  $("#pane-itogi").innerHTML = btn + fuel + vol + flags + end + btn.replace('margin:10px 0 0', 'margin:14px 0 0');
 }
 
 /* ================= Лист для офиса (печать, монохром, польский) ================= */
@@ -1469,41 +1311,16 @@ function printItogi(){
   const row = function(a, b){ return '<tr><td style="border:none;padding:2px 0">' + a +
     '</td><td style="border:none;padding:2px 0;text-align:right">' + esc(b) + '</td></tr>'; };
   const okres = (o.from && o.to) ? (fmtD(o.from) + " – " + fmtD(o.to)) : "";
-  const kl = kpiList(o), ks = kpiScore(kl);
   const html = '<div class="sheet ito">' +
     '<div class="itohead"><div><div class="itotitle">Podsumowanie miesiąca</div>' +
       '<div class="itosub">' + esc(C.name || "") + '</div></div>' +
       '<div class="itosub" style="text-align:right">' + esc(h.nrRej || "") + '<br>' + esc(kier) + '</div></div>' +
 
-    '<div class="itoh">KPI — ocena miesiąca</div>' +
-    '<table class="nb itotab">' +
-      kl.map(function(x){
-        return '<tr><td style="border:none;padding:2px 0">' + x.n +
-          '</td><td style="border:none;padding:2px 0;text-align:right">' + esc(x.v) +
-          ' &nbsp;<span style="color:#6A727C">norma ' + esc(x.norm) + '</span>' +
-          ' &nbsp;<b>' + Math.round(x.s) + '</b></td></tr>';
-      }).join("") +
-    '</table>' +
-    '<div class="itolvl ' + KPI_SHEET_CLS(ks) + '">Ocena: ' + ks + ' / 100 — ' + kpiTxt(ks) + '</div>' +
-
-    '<div class="itoh">Kilometry wg dni</div>' +
-    '<table class="itoboxes"><tr>' +
-      '<td class="itobox"><div class="itolab">Łącznie</div><div class="itobig">' + nkm(o.km) + ' km</div></td>' +
-      '<td class="itobox"><div class="itolab">Dni w ruchu</div><div class="itobig">' + o.kmDays + ' / ' + o.days.length + '</div></td>' +
-      '<td class="itobox"><div class="itolab">Średnio na dzień</div><div class="itobig">' + nkm(o.kmAvg) + ' km</div></td>' +
-      '<td class="itobox"><div class="itolab">Najlepszy dzień</div><div class="itobig">' + nkm(o.kmMax) + ' km</div></td>' +
-    '</tr></table>' +
-    '<div style="margin-top:6px">' + kmSvg(o, true) + '</div>' +
-    '<div class="itoleg">' +
-      '<i style="background:#C6402A"></i>najlepszy dzień&nbsp;&nbsp;' +
-      '<i style="background:#8A6BC4"></i>w ruchu&nbsp;&nbsp;' +
-      '<i style="background:#D3D6DB"></i>postój</div>' +
-    '<div class="itonote">Cyfry pod wykresem — dni miesiąca. Przebieg między dwoma stanami licznika rozłożony na dni proporcjonalnie do czasu; stany brane z karty drogowej (Stany Samochodu i kilometraż przy załadunkach i wyładunkach).</div>' +
-
     '<div class="itoh">Praca</div>' +
     '<table class="nb itotab">' +
       row("Okres", okres) +
       row("Przebieg", nkm(o.km) + " km") +
+      (o.kmAvg ? row("Średnio na dzień", nkm(o.kmAvg) + " km · " + o.dayCount + " dni") : "") +
       row("Zlecenia", o.orders + (o.pca ? " (w tym PCA: " + o.pca + ")" : "")) +
       (o.weighed ? row("Waga łącznie", n1(o.weight / 1000) + " t") : "") +
       (o.emptyPct != null ? row("Puste przebiegi", n1(o.emptyPct) + " % · " + nkm(o.empty) + " km") : "") +
@@ -1523,8 +1340,7 @@ function printItogi(){
 
     '<div class="itolvl ' + LVL_CLS(loadLevel(o)) + '">' + (LVL_PL[loadLevel(o)] || "") + '</div>' +
 
-    '<div class="itofoot">KPI: spalanie — przedział 25–33 l/100 km (zestaw 40 t); dokumenty, mandaty i przebieg — norma firmy. 100 pkt za spalanie — 27 l/100 km i mniej, 0 — od 34. Wagi: spalanie 30, dokumenty 25, puste przebiegi 20, mandaty 15, przebieg 10.<br>' +
-    'Norma pustych przebiegów: transport międzynarodowy UE ' + String(NORM_EMPTY).replace(".", ",") + ' % (Eurostat 2024, road_go_ta_tott).</div>' +
+    '<div class="itofoot">Norma pustych przebiegów: transport międzynarodowy UE ' + String(NORM_EMPTY).replace(".", ",") + ' % (Eurostat 2024, road_go_ta_tott).</div>' +
     sigBlock() + '</div>';
   LG = null;
   return html;
