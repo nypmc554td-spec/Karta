@@ -296,7 +296,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v39</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v43</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1035,12 +1035,9 @@ function applyHl(){
 /* ================= Итоги месяца =================
    Считается только из того, что уже вписано в карту.
    Норма порожнего пробега — Eurostat road_go_ta_tott, 2024:
-   в международных перевозках ЕС порожними выполнено 12,6 % км.
-   Окно 22:00–05:00 — запрет ночной езды в Швейцарии (art. 91 VRV).  */
+   в международных перевозках ЕС порожними выполнено 12,6 % км.  */
 const NORM_EMPTY = 12.6;
 const FUEL_LO = 25, FUEL_HI = 33, FUEL_MIN = 18, FUEL_MAX = 40;
-const NIGHT_FROM = 22, NIGHT_TO = 5;
-
 let LG = null;                         /* временный язык для листа в офис */
 function LX(ru, ua, pl){ const L = LG || lang(); return L === "pl" ? pl : (L === "ua" ? ua : ru); }
 /* в графе Kraj часть кодов набрана кириллицей — «СН», «А» выглядят как латинские */
@@ -1065,44 +1062,56 @@ function dkey(dt){
   return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
 }
 function dshort(k){ const a = k.split("-"); return a[2] + "." + a[1]; }
-function addNight(a, b, map){
-  if(!a || !b || b <= a) return;
-  const spanH = (b - a) / 3600000;
-  const wins = [];
-  let d = new Date(a.getFullYear(), a.getMonth(), a.getDate() - 1);
-  const stop = new Date(b.getFullYear(), b.getMonth(), b.getDate() + 1);
-  let guard = 0;
-  while(d <= stop && guard++ < 120){
-    wins.push([new Date(d.getFullYear(), d.getMonth(), d.getDate(), NIGHT_FROM, 0, 0, 0),
-               new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, NIGHT_TO, 0, 0, 0)]);
-    d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+/* --- километры по дням ---------------------------------------------------
+   Точки: показания счётчика с датой — Stany Samochodu (начало/конец) и графа
+   kilometraż в каждой загрузке/выгрузке. Пробег между двумя показаниями
+   раскладывается по дням пропорционально времени между ними. */
+function kmPoints(){
+  const pts = [];
+  const b = C.baza || {}, st = C.stany || {};
+  const kmP = nnum(st.kmP), kmK = nnum(st.kmK);
+  const t0 = dtOf(b.wyjD, b.wyjG || "00:00"), t1 = dtOf(b.powrD, b.powrG || "23:59");
+  if(kmP != null && t0) pts.push({t:t0, v:kmP});
+  trasaLines().forEach(function(r){
+    const a = dtOf(r.zd, r.zg), zl = nnum(r.zl);
+    if(a && zl != null) pts.push({t:a, v:zl});
+    const c = dtOf(r.wd, r.wg), wl = nnum(r.wl);
+    if(c && wl != null) pts.push({t:c, v:wl});
+  });
+  if(kmK != null && t1) pts.push({t:t1, v:kmK});
+  pts.sort(function(x, y){ return (x.t - y.t) || (x.v - y.v); });
+  return pts;
+}
+function kmByDay(){
+  const pts = kmPoints(), map = {};
+  for(let i = 1; i < pts.length; i++){
+    const a = pts[i - 1], b = pts[i];
+    const dv = b.v - a.v;
+    if(dv <= 0 || dv > 5000) continue;
+    const ms = b.t - a.t;
+    if(ms <= 0){ const k = dkey(b.t); map[k] = (map[k] || 0) + dv; continue; }
+    let cur = new Date(a.t.getTime()), guard = 0;
+    while(cur < b.t && guard++ < 60){
+      const dayEnd = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
+      const to = Math.min(dayEnd.getTime(), b.t.getTime());
+      const k = dkey(cur);
+      map[k] = (map[k] || 0) + dv * (to - cur.getTime()) / ms;
+      cur = new Date(to);
+    }
   }
-  const hit = [];
-  wins.forEach(function(w){
-    const s = Math.max(a.getTime(), w[0].getTime());
-    const e = Math.min(b.getTime(), w[1].getTime());
-    if(e > s) hit.push([w[0], (e - s) / 3600000]);
-  });
-  if(!hit.length) return;
-  /* длинный перегон — внутри точно был отдых, считаем только первую и последнюю ночь */
-  const use = (spanH > 36 && hit.length > 2) ? [hit[0], hit[hit.length - 1]] : hit;
-  use.forEach(function(x){
-    const k = dkey(x[0]);
-    map[k] = Math.min(7, (map[k] || 0) + x[1]);
-  });
+  return map;
 }
 
 function itogi(){
   const o = {km:0, loaded:0, empty:0, emptyPct:null, orders:0, pca:0, weight:0, weighed:0,
-             countries:[], days:[], nightTotal:0, nightCount:0, nightFull:0, nightAvg:0,
-             streak:0, streakFrom:"", streakTo:"",
+             countries:[], days:[], kmDays:0, kmAvg:0, kmMax:0, kmMaxDay:"", kmSpread:0,
              litres:0, segs:[], fuel:null, fuelSrc:"", spread:null,
              odo:null, from:"", to:"", flags:[]};
   const L = trasaLines();
   const kmP = nnum(C.stany.kmP), kmK = nnum(C.stany.kmK);
 
-  /* --- километры, вес, страны, ночи --- */
-  const cmap = {}, nmap = {}, seq = [];
+  /* --- километры, вес, страны, даты --- */
+  const cmap = {}, seq = [];
   let prevW = null, dmin = null, dmax = null;
   L.forEach(function(r, i){
     const zl = nnum(r.zl), wl = nnum(r.wl);
@@ -1118,7 +1127,6 @@ function itogi(){
     if(w != null){ o.weight += w; o.weighed++; }
     else if(String(r.waga || "").trim().toUpperCase() === "PCA") o.pca++;
     const a = dtOf(r.zd, r.zg), b = dtOf(r.wd, r.wg);
-    if(a && b) addNight(a, b, nmap);
     [a, b].forEach(function(x){
       if(!x) return;
       if(!dmin || x < dmin) dmin = x;
@@ -1136,29 +1144,21 @@ function itogi(){
                       .sort(function(a, b){ return b.n - a.n; });
   o.odo = kmK != null ? kmK : (seq.length ? Math.max.apply(null, seq.map(function(x){ return x.v; })) : null);
 
-  /* --- ночи по дням --- */
   if(dmin && dmax){
     o.from = dkey(dmin); o.to = dkey(dmax);
+    const kmap = kmByDay();
     let d = new Date(dmin.getFullYear(), dmin.getMonth(), dmin.getDate()), guard = 0;
     while(d <= dmax && guard++ < 45){
       const k = dkey(d);
-      o.days.push({k:k, h:Math.round((nmap[k] || 0) * 10) / 10});
+      o.days.push({k:k, km:Math.round(kmap[k] || 0)});
       d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
     }
+    o.days.forEach(function(x){
+      if(x.km > 0){ o.kmDays++; o.kmSpread += x.km; }
+      if(x.km > o.kmMax){ o.kmMax = x.km; o.kmMaxDay = x.k; }
+    });
+    o.kmAvg = o.kmDays ? Math.round(o.kmSpread / o.kmDays) : 0;
   }
-  let run = 0, from = "";
-  o.days.forEach(function(x){
-    o.nightTotal += x.h;
-    if(x.h > 0){
-      o.nightCount++;
-      if(x.h >= 6.9) o.nightFull++;
-      if(!run) from = x.k;
-      run++;
-      if(run > o.streak){ o.streak = run; o.streakFrom = from; o.streakTo = x.k; }
-    } else run = 0;
-  });
-  o.nightTotal = Math.round(o.nightTotal);
-  o.nightAvg = o.nightCount ? Math.round(o.nightTotal / o.nightCount * 10) / 10 : 0;
 
   /* --- топливо: только ON тягача --- */
   const TN = C.tankON.filter(function(r){ return r.d || r.litry || r.licznik; });
@@ -1216,45 +1216,35 @@ function itogi(){
 
 function loadLevel(o){
   const s = [o.km > 11500 ? 2 : (o.km >= 8500 ? 1 : 0),
-             o.nightTotal > 75 ? 2 : (o.nightTotal >= 40 ? 1 : 0),
-             o.orders > 22 ? 2 : (o.orders >= 15 ? 1 : 0)];
+             o.orders > 22 ? 2 : (o.orders >= 15 ? 1 : 0),
+             o.countries.length > 6 ? 2 : (o.countries.length >= 4 ? 1 : 0)];
   const n = s[0] + s[1] + s[2];
   return n >= 5 ? "Тяжёлый" : (n >= 2 ? "Обычный" : "Лёгкий");
 }
 
 /* --- графика: SVG, чтобы печаталась и без фоновой заливки --- */
-function nightSvg(o, nums){
-  const d = o.days.length ? o.days : [{k:"", h:0}];
+function kmSvg(o, nums){
+  const d = o.days.length ? o.days : [{k:"", km:0}];
   const W = 320, TOP = nums ? 66 : 58, gap = d.length > 1 ? 1.4 : 0;
   const bw = (W - gap * (d.length - 1)) / d.length;
   const xOf = function(i){ return i * (bw + gap); };
-  let bars = "", ticks = "", strip = "";
+  const mx = Math.max(1, o.kmMax);
+  let bars = "", ticks = "";
   d.forEach(function(x, i){
-    const hh = x.h <= 0 ? 1.6 : Math.max(2.5, x.h / 7 * TOP);
-    const cls = x.h <= 0 ? "nb-zero" : (x.h >= 6.9 ? "nb-full" : "nb-part");
+    const hh = x.km <= 0 ? 1.6 : Math.max(2.5, x.km / mx * TOP);
+    const cls = x.km <= 0 ? "nb-zero" : (x.k === o.kmMaxDay ? "nb-full" : "nb-part");
     bars += '<rect class="' + cls + '" x="' + xOf(i).toFixed(2) + '" y="' + (TOP - hh).toFixed(2) +
             '" width="' + bw.toFixed(2) + '" height="' + hh.toFixed(2) + '"/>';
-    /* на листе для офиса над каждым столбиком — часы, они читаются и на ч/б принтере */
-    if(nums && x.h > 0)
+    /* на листе для офиса цифры ставим только над самым большим днём — иначе не читаются */
+    if(nums && x.k === o.kmMaxDay && x.km > 0)
       bars += '<text class="nnum" x="' + (xOf(i) + bw / 2).toFixed(2) + '" y="' +
-              Math.max(6, TOP - hh - 1.8).toFixed(2) + '" text-anchor="middle">' + Math.round(x.h) + '</text>';
+              Math.max(6, TOP - hh - 1.8).toFixed(2) + '" text-anchor="middle">' + x.km + '</text>';
     const day = parseInt(String(x.k).slice(8), 10);
     if(day === 1 || day % 5 === 0)
       ticks += '<text class="nt" x="' + (xOf(i) + bw / 2).toFixed(2) + '" y="' + (TOP + 14) + '" text-anchor="middle">' + day + '</text>';
   });
-  /* полоска под самой длинной серией ночей подряд */
-  if(o.streak >= 3){
-    let a = -1;
-    d.forEach(function(x, i){ if(a < 0 && x.k === o.streakFrom) a = i; });
-    if(a >= 0){
-      const b = a + o.streak - 1;
-      strip = '<rect class="nstreak" x="' + xOf(a).toFixed(2) + '" y="' + (TOP + 3) + '" width="' +
-              (xOf(b) + bw - xOf(a)).toFixed(2) + '" height="2.6"/>';
-    }
-  }
   return '<svg class="chart nchart" viewBox="0 0 ' + W + ' ' + (TOP + 20) + '" role="img">' +
-         bars + '<rect class="ax" x="0" y="' + TOP + '" width="' + W + '" height="0.7"/>' +
-         strip + ticks + '</svg>';
+         bars + '<rect class="ax" x="0" y="' + TOP + '" width="' + W + '" height="0.7"/>' + ticks + '</svg>';
 }
 function scaleSvg(val, lo, hi, mark, band){
   const W = 320, H = 17;
@@ -1299,6 +1289,70 @@ function krajName(k){
 function n1(v){ return (Math.round(v * 10) / 10).toFixed(1).replace(".", ","); }
 function nkm(v){ return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
 
+/* --- KPI: показатели против отраслевых норм + общий балл 0–100 -------------
+   Расход ON: коридор 25–33 л/100 км для еврофуры 40 т.
+   Порожние пробеги: Eurostat 2024 (road_go_ta_tott) — в международных
+   перевозках ЕС порожними выполнено 12,6 % км, по всем перевозкам 21,6 %.
+   Документы, штрафы, пробег — норма фирмы: ноль замечаний, ноль штрафов,
+   10 000 км международного пробега в месяц. */
+const KM_NORM = 10000, KM_LO = 6000, KM_HI = 11500;
+/* баллы за расход: 100 при 27 л/100 и ниже, 0 при 34 — коридор 25–33 остаётся нормой на шкале */
+const FUEL_SC_GOOD = 27, FUEL_SC_BAD = 34;
+const EMPTY_HI = 25, EMPTY_LO = 6;
+function clamp01(x){ return x < 0 ? 0 : (x > 1 ? 1 : x); }
+function kpiList(o){
+  const it = [];
+  if(o.fuel != null)
+    it.push({n:LX("Расход ON","Витрата ON","Spalanie ON"),
+             v:n1(o.fuel) + " " + LX("л/100 км","л/100 км","l/100 km"),
+             norm:"≤ " + FUEL_HI, w:30,
+             s:clamp01((FUEL_SC_BAD - o.fuel) / (FUEL_SC_BAD - FUEL_SC_GOOD)) * 100});
+  if(o.emptyPct != null)
+    it.push({n:LX("Порожние пробеги","Порожні пробіги","Puste przebiegi"),
+             v:n1(o.emptyPct) + " %",
+             norm:"≤ " + String(NORM_EMPTY).replace(".", ",") + " %", w:20,
+             s:clamp01((EMPTY_HI - o.emptyPct) / (EMPTY_HI - EMPTY_LO)) * 100});
+  const bad = o.flags.filter(function(f){ return f.t === "bad"; }).length;
+  const warn = o.flags.filter(function(f){ return f.t === "warn"; }).length;
+  it.push({n:LX("Документы","Документи","Dokumenty"),
+           v:(bad + warn) ? (bad + warn) + " " + LX("замеч.","заув.","uwag") : LX("чисто","чисто","czysto"),
+           norm:"0", w:25,
+           s:Math.max(0, 100 - bad * 35 - warn * 12)});
+  const mand = (C.mandaty || []).filter(function(r){ return r.co || r.kwota; }).length;
+  it.push({n:LX("Штрафы","Штрафи","Mandaty"), v:String(mand), norm:"0", w:15,
+           s:Math.max(0, 100 - mand * 35)});
+  if(o.km > 0)
+    it.push({n:LX("Пробег за месяц","Пробіг за місяць","Przebieg miesięczny"),
+             v:nkm(o.km) + " " + LX("км","км","km"),
+             norm:"≥ " + nkm(KM_NORM), w:10,
+             s:clamp01((o.km - KM_LO) / (KM_HI - KM_LO)) * 100});
+  return it;
+}
+function kpiScore(it){
+  let sw = 0, sv = 0;
+  it.forEach(function(x){ sw += x.w; sv += x.s * x.w; });
+  return sw ? Math.round(sv / sw) : 0;
+}
+function KPI_SHEET_CLS(s){ return s >= 75 ? "lv-lo" : (s >= 50 ? "lv-md" : "lv-hi"); }
+function kpiCls(s){ return s >= 75 ? "ok" : (s >= 50 ? "warn" : "bad"); }
+function kpiTxt(s){
+  return s >= 85 ? LX("Отлично","Відмінно","Bardzo dobrze")
+       : s >= 70 ? LX("Хорошо","Добре","Dobrze")
+       : s >= 55 ? LX("Нормально","Нормально","Poprawnie")
+                 : LX("Есть куда расти","Є куди рости","Jest co poprawić");
+}
+const KPI_COL = {ok:"#3E8E5A", warn:"#C79A2E", bad:"#C6402A"};
+function kpiRow(x){
+  const c = KPI_COL[kpiCls(x.s)];
+  return '<div style="margin-top:9px">' +
+    '<div style="display:flex;justify-content:space-between;font-size:13px">' +
+      '<span>' + x.n + '</span>' +
+      '<b>' + x.v + ' <i style="font-style:normal;font-weight:400;color:var(--dim)">' + LX("норма","норма","norma") + ' ' + x.norm + '</i></b>' +
+    '</div>' +
+    '<div style="height:6px;border-radius:3px;background:#E7E9EC;margin-top:4px;overflow:hidden">' +
+      '<div style="height:6px;width:' + Math.round(x.s) + '%;background:' + c + '"></div></div></div>';
+}
+
 function renderItogi(){
   const o = itogi();
   if(!o.orders && !o.litres){
@@ -1313,29 +1367,34 @@ function renderItogi(){
   const btn = '<button class="btn primary" id="btnItogiPrint" style="width:100%;margin:10px 0 0">' +
     LX("Лист для офиса","Аркуш для офісу","Arkusz dla biura") + '</button>';
 
-  const night = '<div class="card"><h3>' + LX("Ночная работа","Нічна робота","Praca nocna") + ' · ' +
-      LX("окно","вікно","okno") + ' 22:00–05:00</h3>' +
+  const kl = kpiList(o), ks = kpiScore(kl);
+  const kpiCard = '<div class="card"><h3>KPI · ' + LX("оценка месяца","оцінка місяця","ocena miesiąca") + '</h3>' +
+    '<div class="sum-big" style="color:' + KPI_COL[kpiCls(ks)] + '">' + ks + ' <span style="font-size:14px;color:var(--dim);font-weight:400">/ 100 · ' + kpiTxt(ks) + '</span></div>' +
+    kl.map(kpiRow).join("") +
+    '<p class="hint">' + LX("Расход: коридор 25–33 л/100 км для еврофуры 40 т. Порожние: Eurostat 2024, в международных перевозках ЕС 12,6 % км порожняком (по всем перевозкам 21,6 %). Документы, штрафы и пробег — норма фирмы. 100 баллов за расход — 27 л/100 км и ниже, 0 — от 34. Вес показателей: расход 30, документы 25, порожняк 20, штрафы 15, пробег 10.",
+        "Витрата: коридор 25–33 л/100 км для єврофури 40 т. Порожні: Eurostat 2024, у міжнародних перевезеннях ЄС 12,6 % км порожняком (за всіма перевезеннями 21,6 %). Документи, штрафи і пробіг — норма фірми. 100 балів за витрату — 27 л/100 км і нижче, 0 — від 34. Вага показників: витрата 30, документи 25, порожняк 20, штрафи 15, пробіг 10.",
+        "Spalanie: przedział 25–33 l/100 km dla zestawu 40 t. Puste przebiegi: Eurostat 2024, w transporcie międzynarodowym UE 12,6 % km na pusto (dla całości 21,6 %). Dokumenty, mandaty i przebieg — norma firmy. 100 pkt za spalanie — 27 l/100 km i mniej, 0 — od 34. Wagi: spalanie 30, dokumenty 25, puste 20, mandaty 15, przebieg 10.") + '</p></div>';
+
+  const kmday = '<div class="card"><h3>' + LX("Километры по дням","Кілометри по днях","Kilometry wg dni") + '</h3>' +
     '<div class="sum-grid">' +
-      '<div class="sum-cell"><span>' + LX("Всего","Разом","Łącznie") + '</span><b>' + o.nightTotal + ' ' + H + '</b></div>' +
-      '<div class="sum-cell"><span>' + LX("Ночей задействовано","Ночей задіяно","Nocy z pracą") + '</span><b>' + o.nightCount +
+      '<div class="sum-cell"><span>' + LX("Всего","Разом","Łącznie") + '</span><b>' + nkm(o.km) + ' ' + KM + '</b></div>' +
+      '<div class="sum-cell"><span>' + LX("Дней в движении","Днів у русі","Dni w ruchu") + '</span><b>' + o.kmDays +
         ' <i style="font-style:normal;font-size:13px;color:var(--dim)">' + OF + ' ' + o.days.length + '</i></b></div>' +
-      '<div class="sum-cell"><span>' + LX("Средняя рабочая ночь","Середня робоча ніч","Średnia noc") + '</span><b>' + n1(o.nightAvg) + ' ' + H + '</b></div>' +
-      '<div class="sum-cell"><span>' + LX("Полных ночей","Повних ночей","Pełnych nocy") + '</span><b>' + o.nightFull + '</b></div>' +
+      '<div class="sum-cell"><span>' + LX("В среднем за день","У середньому за день","Średnio na dzień") + '</span><b>' + nkm(o.kmAvg) + ' ' + KM + '</b></div>' +
+      '<div class="sum-cell"><span>' + LX("Лучший день","Найкращий день","Najlepszy dzień") + '</span><b>' + nkm(o.kmMax) + ' ' + KM +
+        (o.kmMaxDay ? ' <i style="font-style:normal;font-size:13px;color:var(--dim)">' + dshort(o.kmMaxDay) + '</i>' : '') + '</b></div>' +
     '</div>' +
-    '<div style="margin-top:12px">' + nightSvg(o) + '</div>' +
+    '<div style="margin-top:12px">' + kmSvg(o) + '</div>' +
     '<div class="sum-note" style="margin-top:4px">' +
       '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#C6402A;vertical-align:-1px;margin-right:4px"></span>' +
-      LX("все 7 ч","усі 7 год","pełne 7 h") + '&nbsp;&nbsp;' +
+      LX("лучший день","найкращий день","najlepszy dzień") + '&nbsp;&nbsp;' +
       '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#8A6BC4;vertical-align:-1px;margin-right:4px"></span>' +
-      LX("часть ночи","частина ночі","część nocy") + '&nbsp;&nbsp;' +
+      LX("в движении","у русі","w ruchu") + '&nbsp;&nbsp;' +
       '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#D3D6DB;vertical-align:-1px;margin-right:4px"></span>' +
-      LX("свободна","вільна","noc wolna") + '</div>' +
-    (o.streak >= 3 ? '<div class="sum-flag bad"><b>' +
-      LX("Серия: " + o.streak + " ночей подряд", "Серія: " + o.streak + " ночей поспіль", "Seria: " + o.streak + " nocy pod rząd") +
-      '</b>' + dshort(o.streakFrom) + ' — ' + dshort(o.streakTo) + '</div>' : "") +
-    '<p class="hint">' + LX("Считается по времени погрузок и выгрузок из карты — цифра ориентировочная, тахограф она не заменяет.",
-        "Рахується за часом завантажень і вивантажень з карти — цифра орієнтовна, тахограф вона не замінює.",
-        "Liczone na podstawie czasów załadunku i rozładunku z karty — wartość orientacyjna, nie zastępuje tachografu.") + '</p></div>';
+      LX("стоянка","стоянка","postój") + '</div>' +
+    '<p class="hint">' + LX("Берутся показания счётчика с датой: Stany Samochodu и графа kilometraż в каждой загрузке и выгрузке. Пробег между двумя показаниями раскладывается по дням пропорционально времени.",
+        "Беруться показання лічильника з датою: Stany Samochodu і графа kilometraż у кожному завантаженні та вивантаженні. Пробіг між двома показаннями розкладається по днях пропорційно часу.",
+        "Brane są stany licznika z datą: Stany Samochodu i kilometraż przy każdym załadunku i wyładunku. Przebieg między dwoma stanami rozkładany jest na dni proporcjonalnie do czasu.") + '</p></div>';
 
   const fuel = '<div class="card"><h3>' + LX("Расход ON","Витрата ON","Spalanie ON") + '</h3>' +
     (o.fuel != null
@@ -1390,10 +1449,10 @@ function renderItogi(){
   const end = '<div class="card"><h3>' + LX("Нагрузка месяца","Навантаження місяця","Obciążenie miesiąca") + '</h3>' +
     '<div class="sum-big">' + esc(LVL_TXT(lvl)) + '</div>' +
     '<p class="sum-note" style="margin:6px 0 0">' + LX("Пробег","Пробіг","Przebieg") + ' ' + nkm(o.km) + ' ' + KM + ' · ' +
-      LX("заказов","замовлень","zlecenia") + ' ' + o.orders + ' · ' + LX("ночная работа","нічна робота","praca nocna") + ' ' +
-      o.nightTotal + ' ' + H + '.</p></div>';
+      LX("заказов","замовлень","zlecenia") + ' ' + o.orders +
+      (o.countries.length ? ' · ' + LX("стран","країн","kraje") + ' ' + o.countries.length : '') + '.</p></div>';
 
-  $("#pane-itogi").innerHTML = btn + night + fuel + vol + flags + end + btn.replace('margin:10px 0 0', 'margin:14px 0 0');
+  $("#pane-itogi").innerHTML = btn + kpiCard + kmday + fuel + vol + flags + end + btn.replace('margin:10px 0 0', 'margin:14px 0 0');
 }
 
 /* ================= Лист для офиса (печать, монохром, польский) ================= */
@@ -1410,26 +1469,36 @@ function printItogi(){
   const row = function(a, b){ return '<tr><td style="border:none;padding:2px 0">' + a +
     '</td><td style="border:none;padding:2px 0;text-align:right">' + esc(b) + '</td></tr>'; };
   const okres = (o.from && o.to) ? (fmtD(o.from) + " – " + fmtD(o.to)) : "";
+  const kl = kpiList(o), ks = kpiScore(kl);
   const html = '<div class="sheet ito">' +
     '<div class="itohead"><div><div class="itotitle">Podsumowanie miesiąca</div>' +
       '<div class="itosub">' + esc(C.name || "") + '</div></div>' +
       '<div class="itosub" style="text-align:right">' + esc(h.nrRej || "") + '<br>' + esc(kier) + '</div></div>' +
 
-    '<div class="itoh">Praca w oknie 22:00–05:00</div>' +
+    '<div class="itoh">KPI — ocena miesiąca</div>' +
+    '<table class="nb itotab">' +
+      kl.map(function(x){
+        return '<tr><td style="border:none;padding:2px 0">' + x.n +
+          '</td><td style="border:none;padding:2px 0;text-align:right">' + esc(x.v) +
+          ' &nbsp;<span style="color:#6A727C">norma ' + esc(x.norm) + '</span>' +
+          ' &nbsp;<b>' + Math.round(x.s) + '</b></td></tr>';
+      }).join("") +
+    '</table>' +
+    '<div class="itolvl ' + KPI_SHEET_CLS(ks) + '">Ocena: ' + ks + ' / 100 — ' + kpiTxt(ks) + '</div>' +
+
+    '<div class="itoh">Kilometry wg dni</div>' +
     '<table class="itoboxes"><tr>' +
-      '<td class="itobox"><div class="itolab">Łącznie</div><div class="itobig">' + o.nightTotal + ' h</div></td>' +
-      '<td class="itobox"><div class="itolab">Nocy z pracą</div><div class="itobig">' + o.nightCount + ' / ' + o.days.length + '</div></td>' +
-      '<td class="itobox"><div class="itolab">Średnia noc</div><div class="itobig">' + n1(o.nightAvg) + ' h</div></td>' +
-      '<td class="itobox"><div class="itolab">Pełnych nocy</div><div class="itobig">' + o.nightFull + '</div></td>' +
+      '<td class="itobox"><div class="itolab">Łącznie</div><div class="itobig">' + nkm(o.km) + ' km</div></td>' +
+      '<td class="itobox"><div class="itolab">Dni w ruchu</div><div class="itobig">' + o.kmDays + ' / ' + o.days.length + '</div></td>' +
+      '<td class="itobox"><div class="itolab">Średnio na dzień</div><div class="itobig">' + nkm(o.kmAvg) + ' km</div></td>' +
+      '<td class="itobox"><div class="itolab">Najlepszy dzień</div><div class="itobig">' + nkm(o.kmMax) + ' km</div></td>' +
     '</tr></table>' +
-    '<div style="margin-top:6px">' + nightSvg(o, true) + '</div>' +
+    '<div style="margin-top:6px">' + kmSvg(o, true) + '</div>' +
     '<div class="itoleg">' +
-      '<i style="background:#C6402A"></i>pełne 7 h&nbsp;&nbsp;' +
-      '<i style="background:#8A6BC4"></i>częściowo&nbsp;&nbsp;' +
-      '<i style="background:#D3D6DB"></i>noc wolna</div>' +
-    '<div class="itonote">Liczby nad słupkami — godziny w oknie nocnym (w zaokrągleniu). Cyfry pod wykresem — dni miesiąca. Pogrubiona linia pod osią — najdłuższa seria nocy pod rząd.</div>' +
-    (o.streak >= 3 ? '<div class="itoser">Seria: ' + o.streak + ' nocy pod rząd (' +
-      dshort(o.streakFrom) + " – " + dshort(o.streakTo) + ')</div>' : "") +
+      '<i style="background:#C6402A"></i>najlepszy dzień&nbsp;&nbsp;' +
+      '<i style="background:#8A6BC4"></i>w ruchu&nbsp;&nbsp;' +
+      '<i style="background:#D3D6DB"></i>postój</div>' +
+    '<div class="itonote">Cyfry pod wykresem — dni miesiąca. Przebieg między dwoma stanami licznika rozłożony na dni proporcjonalnie do czasu; stany brane z karty drogowej (Stany Samochodu i kilometraż przy załadunkach i wyładunkach).</div>' +
 
     '<div class="itoh">Praca</div>' +
     '<table class="nb itotab">' +
@@ -1454,7 +1523,7 @@ function printItogi(){
 
     '<div class="itolvl ' + LVL_CLS(loadLevel(o)) + '">' + (LVL_PL[loadLevel(o)] || "") + '</div>' +
 
-    '<div class="itofoot">Godziny nocne obliczone na podstawie czasów załadunku i rozładunku z karty drogowej — wartość orientacyjna, nie zastępuje danych z tachografu.<br>' +
+    '<div class="itofoot">KPI: spalanie — przedział 25–33 l/100 km (zestaw 40 t); dokumenty, mandaty i przebieg — norma firmy. 100 pkt za spalanie — 27 l/100 km i mniej, 0 — od 34. Wagi: spalanie 30, dokumenty 25, puste przebiegi 20, mandaty 15, przebieg 10.<br>' +
     'Norma pustych przebiegów: transport międzynarodowy UE ' + String(NORM_EMPTY).replace(".", ",") + ' % (Eurostat 2024, road_go_ta_tott).</div>' +
     sigBlock() + '</div>';
   LG = null;
