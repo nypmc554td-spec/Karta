@@ -102,7 +102,8 @@ textarea{min-height:90px;line-height:1.35}
 .rst{font-size:10px;font-weight:800;letter-spacing:.06em;padding:2px 8px;border-radius:999px;text-transform:uppercase}
 .rst.done{color:#1F6B41}
 .rst.todo{color:#8A5A00}
-.item .ihead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.item .ihead{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.item .ihead>b{margin-right:2px}
 .item .ihead b{font-size:12px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase}
 .item .ihead .del{margin-left:auto;background:transparent;border:none;color:var(--red);font-size:13px;font-weight:700;cursor:pointer;padding:4px 6px}
 .sub{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin:14px 0 4px 2px;display:flex;align-items:center;gap:8px}
@@ -299,7 +300,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v45</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v46</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -844,7 +845,7 @@ function rowKmTxt(r, i){
   const k = rowKm(r, i);
   if(!k) return "";
   return '<b>' + nkm(k.km) + ' ' + T("км") + '</b>' +
-         (k.pod ? ' <i>+' + nkm(k.pod) + ' ' + T("подача") + '</i>' : '');
+         (k.pod ? ' <i>+' + nkm(k.pod) + '</i>' : '');
 }
 
 function paintRow(el){
