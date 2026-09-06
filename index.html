@@ -70,6 +70,12 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--amber);outline-o
 body.hl input.empty,body.hl textarea.empty,body.hl select.empty{background:#FFF6DE;border-color:#E3C489}
 body.hl input.empty:focus,body.hl textarea.empty:focus,body.hl select.empty:focus{background:#FFFFFF}
 @media print{ input.empty,textarea.empty,select.empty{background:#fff !important;border-color:#C7CBD1 !important} }
+input.badval,textarea.badval,select.badval{background:#FDEAEA !important;border-color:#D64545 !important}
+input.badval:focus,textarea.badval:focus,select.badval:focus{background:#FFFFFF}
+@media print{ input.badval,textarea.badval,select.badval{background:#fff !important;border-color:#C7CBD1 !important} }
+input.badseq,textarea.badseq,select.badseq{background:#FDEAEA !important;border-color:#D64545 !important}
+input.badseq:focus,textarea.badseq:focus,select.badseq:focus{background:#FFFFFF}
+@media print{ input.badseq,textarea.badseq,select.badseq{background:#fff !important;border-color:#C7CBD1 !important} }
 input[type=date],input[type=time]{min-height:44px}
 textarea{min-height:90px;line-height:1.35}
 .row2{display:flex;gap:6px}
@@ -887,7 +893,12 @@ function paintRow(el){
   const sm = el.querySelector(".rsum");
   if(sm && folded){ sm.innerHTML = rowSummary(list, r); translateTree(sm); }
 }
-function paintRows(){ document.querySelectorAll(".item[data-row]").forEach(paintRow); paintEmpty(); }
+function paintRows(){ document.querySelectorAll(".item[data-row]").forEach(paintRow); paintEmpty(); paintValid(); }
+function paintValid(){
+  document.querySelectorAll("main input[data-p], main select[data-p], main textarea[data-p]").forEach(validateEl);
+  checkKmSequence();
+  (C.trasa||[]).forEach(function(_,i){ checkDateOrder(i); });
+}
 
 function renderTrasa(){
   const rows = C.trasa.map((r,i)=>`
@@ -1072,6 +1083,64 @@ function renderInfo(){
 }
 
 function markEmpty(el){ el.classList.toggle("empty", String(el.value||"").trim()===""); }
+
+/* ---------- Проверка вводимых чисел (км, литры, суммы) ---------- */
+function isBadNumber(v){
+  const s = String(v==null?"":v).trim();
+  if(s==="") return false;               // пусто — не ошибка, это ловит "Пустые"
+  const n = nnum(s);
+  return n===null || n<0;
+}
+function litryBad(v){
+  const s = String(v==null?"":v).trim();
+  if(s==="") return false;
+  return s.split("+").some(isBadNumber);
+}
+function fieldKind(path){
+  if(!path) return null;
+  if(/\.(zl|wl)$/.test(path) || path==="stany.kmP" || path==="stany.kmK") return "km";
+  if(/\.litry$/.test(path)) return "litry";
+  if(/\.kwota$/.test(path)) return "kwota";
+  return null;
+}
+function validateEl(el){
+  const path = el.dataset.p; const kind = fieldKind(path);
+  if(!kind){ return; }
+  let bad = false;
+  if(kind==="km") bad = isBadNumber(el.value);
+  else if(kind==="litry") bad = litryBad(el.value);
+  else if(kind==="kwota") bad = isBadNumber(el.value) || (nnum(el.value)!==null && nnum(el.value) > 999999);
+  el.classList.toggle("badval", bad);
+}
+/* Километраж по всей карте должен идти по возрастанию: Początek → загрузки/выгрузки
+   по порядку строк Trasa → Koniec. Подсвечивает поле, если оно меньше предыдущего. */
+function checkKmSequence(){
+  const order = ["stany.kmP"];
+  (C.trasa||[]).forEach(function(r,i){
+    zList(r).forEach(function(_,j){ order.push(j===0 ? "trasa."+i+".zl" : "trasa."+i+".z2."+(j-1)+".zl"); });
+    wList(r).forEach(function(_,j){ order.push(j===0 ? "trasa."+i+".wl" : "trasa."+i+".w2."+(j-1)+".wl"); });
+  });
+  order.push("stany.kmK");
+  let prev = null;
+  order.forEach(function(p){
+    const el = document.querySelector('[data-p="'+p+'"]');
+    const n = nnum(getP(C,p));
+    if(n==null){ return; }
+    const bad = prev!=null && n < prev;
+    if(el) el.classList.toggle("badseq", bad);
+    prev = n;
+  });
+}
+/* В строке Trasa дата выгрузки не должна быть раньше даты загрузки */
+function checkDateOrder(i){
+  const r = (C.trasa||[])[i]; if(!r) return;
+  const zEl = document.querySelector('[data-p="trasa.'+i+'.zd"]');
+  const wEl = document.querySelector('[data-p="trasa.'+i+'.wd"]');
+  if(!r.zd || !r.wd){ if(zEl) zEl.classList.remove("badseq"); if(wEl) wEl.classList.remove("badseq"); return; }
+  const bad = new Date(r.zd) > new Date(r.wd);
+  if(zEl) zEl.classList.toggle("badseq", bad);
+  if(wEl) wEl.classList.toggle("badseq", bad);
+}
 function paintEmpty(){
   if(!document.body.classList.contains("hl")) return;
   document.querySelectorAll("main input[data-p], main select[data-p], main textarea[data-p]").forEach(markEmpty);
@@ -1824,9 +1893,15 @@ document.addEventListener("input", e=>{
   if(el.dataset.bool) v = v==="1";
   if(el.dataset.p === "printInstr") v = el.value==="1";
   setP(C, el.dataset.p, v); save();
+  validateEl(el);
   const row = el.closest(".item[data-row]"); if(row) paintRow(row);
-  if(/\.(zl|wl)$/.test(el.dataset.p || ""))
+  if(/\.(zl|wl)$/.test(el.dataset.p || "")){
     document.querySelectorAll('.item[data-row^="trasa|"]').forEach(paintRow);
+    checkKmSequence();
+  }
+  if(el.dataset.p === "stany.kmP" || el.dataset.p === "stany.kmK") checkKmSequence();
+  const dm = /^trasa\.(\d+)\.(zd|wd)$/.exec(el.dataset.p || "");
+  if(dm) checkDateOrder(+dm[1]);
 });
 document.addEventListener("change", e=>{
   const el = e.target.closest("[data-p]"); if(!el) return;
@@ -1842,6 +1917,10 @@ document.addEventListener("change", e=>{
   markEmpty(el);
   let v = el.value; if(el.dataset.p==="printInstr") v = el.value==="1";
   setP(C, el.dataset.p, v); save();
+  validateEl(el);
+  if(/\.(zl|wl)$/.test(el.dataset.p || "") || el.dataset.p==="stany.kmP" || el.dataset.p==="stany.kmK") checkKmSequence();
+  const dm2 = /^trasa\.(\d+)\.(zd|wd)$/.exec(el.dataset.p || "");
+  if(dm2) checkDateOrder(+dm2[1]);
   const row = el.closest(".item[data-row]"); if(row) paintRow(row);
 });
 
