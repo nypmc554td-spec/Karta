@@ -843,7 +843,10 @@ function rowSummary(list, r){
 }
 
 /* --- километры по заказу: от первой загрузки до последней выгрузки по счётчику,
-   плюс подача — порожняк от выгрузки предыдущей строки до этой загрузки --- */
+   плюс подача — порожняк от выгрузки предыдущей строки до этой загрузки.
+   Для самой первой строки карты предыдущей выгрузки внутри неё нет, поэтому
+   подача считается от Stan licznika KM «Początek» (stany.kmP) — счётчика на
+   начало периода, который и так переписывается с компьютера. --- */
 function rowKm(r, i){
   const zs = zList(r).map(function(x){ return nnum(x.zl); }).filter(function(v){ return v != null; });
   const ws = wList(r).map(function(x){ return nnum(x.wl); }).filter(function(v){ return v != null; });
@@ -852,12 +855,21 @@ function rowKm(r, i){
   const km = b - a;
   if(km < 0 || km > 5000) return null;
   let pod = null;
+  let prevFound = false;
   for(let j = (+i) - 1; j >= 0; j--){
     const pw = wList(C.trasa[j]).map(function(x){ return nnum(x.wl); }).filter(function(v){ return v != null; });
     if(pw.length){
       const d = a - Math.max.apply(null, pw);
       if(d >= 0 && d < 3000) pod = d;
+      prevFound = true;
       break;
+    }
+  }
+  if(!prevFound){
+    const startOdo = nnum(C.stany.kmP);
+    if(startOdo != null){
+      const d = a - startOdo;
+      if(d >= 0 && d < 3000) pod = d;
     }
   }
   return {km:km, pod:pod};
@@ -1191,7 +1203,9 @@ function itogi(){
 
   /* --- километры, вес, страны, даты --- */
   const cmap = {}, seq = [];
-  let prevW = null, dmin = null, dmax = null;
+  /* база отсчёта для подачи первой строки — счётчик на начало периода (Początek),
+     иначе доезд до первой загрузки нигде не считался (см. rowKm) */
+  let prevW = kmP, dmin = null, dmax = null;
   L.forEach(function(r, i){
     const zl = nnum(r.zl), wl = nnum(r.wl);
     if(zl != null && wl != null && wl >= zl && wl - zl < 5000) o.loaded += wl - zl;
