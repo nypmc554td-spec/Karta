@@ -307,10 +307,10 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v51</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v52</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
-    <button class="btn" id="btnPrintTab" title="Если печать не открывается">Страница ↗</button>
+    <button class="btn" id="btnPrintNative" title="Обычная печать Safari">Печать</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
       <option value="ru">🇧🇾 Русский</option>
       <option value="ua">🇺🇦 Українська</option>
@@ -2121,13 +2121,13 @@ document.addEventListener("click", async e=>{
   }
 
   switch(t.id){
-    /* iOS 27: window.print() после setTimeout теряет «жест пользователя» и
-       молча не открывается. Вёрстка строится синхронно (getBoundingClientRect
-       сам форсирует layout), поэтому печать вызываем сразу, в том же клике. */
-    case "btnPrint": PRINT_MODE = "card"; buildPrint(); safePrint(); break;
-    case "btnPrintTab": PRINT_MODE = "card"; buildPrint(); openPrintTab(); break;
+    /* iOS 27: window.print() в веб-приложении больше не открывается. Поэтому
+       «Печать / PDF» теперь сама собирает настоящий PDF и отдаёт его через
+       «Поделиться» (там есть Печать и Сохранить в Файлы). */
+    case "btnPrint": PRINT_MODE = "card"; buildPrint(); exportPdf(); break;
+    case "btnPrintNative": PRINT_MODE = "card"; buildPrint(); safePrint(); break;
     case "btnItogiPrint": PRINT_MODE = "itogi";
-      if(buildItogiPrint()) safePrint(); else PRINT_MODE = "card";
+      if(buildItogiPrint()) exportPdf(); else PRINT_MODE = "card";
       break;
     case "btnNew": { const n = prompt(T("Название новой карты:"), "Karta " + new Date().toLocaleDateString("ru-RU"));
       if(n===null) return;
@@ -2181,26 +2181,117 @@ $("#fileIn").addEventListener("change", e=>{
 let PRINT_MODE = "card";
 function safePrint(){
   try{ window.print(); }
-  catch(e){ toast("Печать недоступна — жми «Страница ↗»"); }
+  catch(e){ toast("Печать недоступна — жми «Печать / PDF»"); }
 }
-/* Запасной путь: лист как обычная страница в новой вкладке.
-   Оттуда: кнопка «Поделиться» Safari → «Печать» / «Сохранить в Файлы (PDF)». */
-function openPrintTab(){
-  const css = Array.from(document.querySelectorAll("style")).map(x=>x.textContent).join("\n");
-  const body = $("#print").innerHTML;
-  const html = '<!doctype html><html><head><meta charset="utf-8">' +
-    '<meta name="viewport" content="width=700">' +
-    '<style>' + css + '\n#print{position:static!important;left:auto!important;margin:0 auto}' +
-    'body{background:#fff;margin:0}.page{margin:0 auto 10px}</style></head>' +
-    '<body><div id="print">' + body + '</div></body></html>';
-  const url = URL.createObjectURL(new Blob([html], {type:"text/html"}));
-  const w = window.open(url, "_blank");
-  if(!w) location.href = url;
+
+/* ---------- PDF без библиотек ----------
+   Каждый лист (#print .page) рисуется в картинку через SVG foreignObject,
+   картинки упаковываются в PDF (A4, поля 12 мм) — как и при обычной печати. */
+function pageToJpeg(pageEl, scale){
+  return new Promise((resolve, reject)=>{
+    const css = Array.from(document.querySelectorAll("style")).map(x=>x.textContent).join("\n");
+    const wrap = document.createElement("div");
+    wrap.setAttribute("xmlns","http://www.w3.org/1999/xhtml");
+    const st = document.createElement("style");
+    st.textContent = css + "\n#print{position:static!important;left:auto!important;width:" + BOX_W + "px}" +
+                     ".page{margin:0!important}";
+    const box = document.createElement("div");
+    box.id = "print";
+    box.appendChild(pageEl.cloneNode(true));
+    wrap.appendChild(st); wrap.appendChild(box);
+    const xml = new XMLSerializer().serializeToString(wrap);
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'+BOX_W+'" height="'+BOX_H+'">' +
+                '<foreignObject x="0" y="0" width="100%" height="100%">' + xml + '</foreignObject></svg>';
+    const img = new Image();
+    img.onload = ()=>{
+      try{
+        const cv = document.createElement("canvas");
+        cv.width = BOX_W*scale; cv.height = BOX_H*scale;
+        const cx = cv.getContext("2d");
+        cx.fillStyle = "#fff"; cx.fillRect(0,0,cv.width,cv.height);
+        cx.drawImage(img, 0, 0, cv.width, cv.height);
+        const d = cv.toDataURL("image/jpeg", 0.92).split(",")[1];
+        const bin = atob(d), u = new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++) u[i] = bin.charCodeAt(i);
+        resolve({bytes:u, w:cv.width, h:cv.height});
+      }catch(e){ reject(e); }
+    };
+    img.onerror = ()=>reject(new Error("svg"));
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  });
 }
-window.addEventListener("beforeprint", function(){
-  if(PRINT_MODE === "itogi") buildItogiPrint(); else buildPrint();
-});
-window.addEventListener("afterprint", function(){ PRINT_MODE = "card"; });
+
+function makePdf(imgs){
+  const enc = new TextEncoder(), parts = [], offs = [];
+  let len = 0;
+  const push = b => { if(typeof b === "string") b = enc.encode(b); parts.push(b); len += b.length; };
+  const obj = (n, body) => { offs[n] = len; push(n + " 0 obj\n"); push(body); push("\nendobj\n"); };
+  const PW = 595.28, PH = 841.89, M = 34;           // A4, поля 12 мм
+  const W = PW - 2*M, H = W * BOX_H / BOX_W;
+  push("%PDF-1.4\n");
+  obj(1, "<< /Type /Catalog /Pages 2 0 R >>");
+  const kids = imgs.map((_,i)=> (3+3*i) + " 0 R").join(" ");
+  obj(2, "<< /Type /Pages /Kids [" + kids + "] /Count " + imgs.length + " >>");
+  imgs.forEach((im,i)=>{
+    const pg = 3+3*i, ct = pg+1, ix = pg+2;
+    obj(pg, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + PW + " " + PH + "] /Resources << /XObject << /Im0 " + ix + " 0 R >> >> /Contents " + ct + " 0 R >>");
+    const c = "q " + W.toFixed(2) + " 0 0 " + H.toFixed(2) + " " + M + " " + (PH - M - H).toFixed(2) + " cm /Im0 Do Q";
+    obj(ct, "<< /Length " + c.length + " >>\nstream\n" + c + "\nendstream");
+    offs[ix] = len;
+    push(ix + " 0 obj\n<< /Type /XObject /Subtype /Image /Width " + im.w + " /Height " + im.h +
+         " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + im.bytes.length + " >>\nstream\n");
+    push(im.bytes); push("\nendstream\nendobj\n");
+  });
+  const n = 3 + 3*imgs.length, xr = len;
+  let x = "xref\n0 " + n + "\n0000000000 65535 f \n";
+  for(let i=1;i<n;i++) x += String(offs[i]).padStart(10,"0") + " 00000 n \n";
+  push(x + "trailer\n<< /Size " + n + " /Root 1 0 R >>\nstartxref\n" + xr + "\n%%EOF");
+  return new Blob(parts, {type:"application/pdf"});
+}
+
+function showPdfSheet(blob, name){
+  const old = document.getElementById("pdfSheet"); if(old) old.remove();
+  const url = URL.createObjectURL(blob);
+  const file = new File([blob], name, {type:"application/pdf"});
+  const ov = document.createElement("div");
+  ov.id = "pdfSheet";
+  ov.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px";
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px;padding:18px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:10px;font-family:-apple-system,Arial,sans-serif">' +
+    '<b style="font-size:18px;color:#15181C">PDF готов</b>' +
+    '<div style="font-size:13px;color:#6A727C;word-break:break-all">' + name + '</div>' +
+    '<button class="btn primary" id="pdfShare" style="width:100%">Поделиться / Печать</button>' +
+    '<button class="btn" id="pdfOpen" style="width:100%">Открыть PDF</button>' +
+    '<button class="btn" id="pdfClose" style="width:100%">Закрыть</button></div>';
+  document.body.appendChild(ov);
+  const close = ()=>{ ov.remove(); setTimeout(()=>URL.revokeObjectURL(url), 60000); };
+  ov.querySelector("#pdfClose").onclick = close;
+  ov.querySelector("#pdfOpen").onclick = ()=>{ const w = window.open(url, "_blank"); if(!w) location.href = url; };
+  ov.querySelector("#pdfShare").onclick = async ()=>{
+    try{
+      if(navigator.canShare && navigator.canShare({files:[file]})) await navigator.share({files:[file], title:name});
+      else { const w = window.open(url, "_blank"); if(!w) location.href = url; }
+    }catch(e){ if(e && e.name !== "AbortError") toast("Не вышло — жми «Открыть PDF»"); }
+  };
+}
+
+let PDF_BUSY = false;
+async function exportPdf(){
+  if(PDF_BUSY) return;
+  PDF_BUSY = true;
+  toast("Готовлю PDF…");
+  try{
+    await new Promise(r=>setTimeout(r,30));
+    const pages = Array.from(document.querySelectorAll("#print .page"));
+    const imgs = [];
+    for(const pg of pages) imgs.push(await pageToJpeg(pg, 3));
+    const nm = "Karta_" + ((C && C.name) || "drogowa").replace(/[^\wА-Яа-яЁё.-]+/g,"_") + ".pdf";
+    showPdfSheet(makePdf(imgs), nm);
+  }catch(e){
+    toast("PDF не собрался — жми «Печать»");
+  }finally{
+    PDF_BUSY = false; PRINT_MODE = "card";
+  }
+}
 
 /* ================= Офлайн ================= */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
