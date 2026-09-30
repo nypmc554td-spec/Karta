@@ -307,9 +307,10 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v50</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v51</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
+    <button class="btn" id="btnPrintTab" title="Если печать не открывается">Страница ↗</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
       <option value="ru">🇧🇾 Русский</option>
       <option value="ua">🇺🇦 Українська</option>
@@ -2120,9 +2121,13 @@ document.addEventListener("click", async e=>{
   }
 
   switch(t.id){
-    case "btnPrint": PRINT_MODE = "card"; buildPrint(); setTimeout(()=>window.print(),120); break;
+    /* iOS 27: window.print() после setTimeout теряет «жест пользователя» и
+       молча не открывается. Вёрстка строится синхронно (getBoundingClientRect
+       сам форсирует layout), поэтому печать вызываем сразу, в том же клике. */
+    case "btnPrint": PRINT_MODE = "card"; buildPrint(); safePrint(); break;
+    case "btnPrintTab": PRINT_MODE = "card"; buildPrint(); openPrintTab(); break;
     case "btnItogiPrint": PRINT_MODE = "itogi";
-      if(buildItogiPrint()) setTimeout(()=>window.print(),120); else PRINT_MODE = "card";
+      if(buildItogiPrint()) safePrint(); else PRINT_MODE = "card";
       break;
     case "btnNew": { const n = prompt(T("Название новой карты:"), "Karta " + new Date().toLocaleDateString("ru-RU"));
       if(n===null) return;
@@ -2174,6 +2179,24 @@ $("#fileIn").addEventListener("change", e=>{
 });
 
 let PRINT_MODE = "card";
+function safePrint(){
+  try{ window.print(); }
+  catch(e){ toast("Печать недоступна — жми «Страница ↗»"); }
+}
+/* Запасной путь: лист как обычная страница в новой вкладке.
+   Оттуда: кнопка «Поделиться» Safari → «Печать» / «Сохранить в Файлы (PDF)». */
+function openPrintTab(){
+  const css = Array.from(document.querySelectorAll("style")).map(x=>x.textContent).join("\n");
+  const body = $("#print").innerHTML;
+  const html = '<!doctype html><html><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=700">' +
+    '<style>' + css + '\n#print{position:static!important;left:auto!important;margin:0 auto}' +
+    'body{background:#fff;margin:0}.page{margin:0 auto 10px}</style></head>' +
+    '<body><div id="print">' + body + '</div></body></html>';
+  const url = URL.createObjectURL(new Blob([html], {type:"text/html"}));
+  const w = window.open(url, "_blank");
+  if(!w) location.href = url;
+}
 window.addEventListener("beforeprint", function(){
   if(PRINT_MODE === "itogi") buildItogiPrint(); else buildPrint();
 });
