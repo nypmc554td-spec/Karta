@@ -307,7 +307,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v53</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v54</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPrintNative" title="Обычная печать Safari">Печать</button>
@@ -2197,19 +2197,33 @@ function pageToJpeg(pageEl, scale){
                      ".page{margin:0!important}";
     const box = document.createElement("div");
     box.id = "print";
-    box.appendChild(pageEl.cloneNode(true));
+    // Подписи в foreignObject WebKit рисует пустыми с первого раза — вынимаем их
+    // из SVG и дорисовываем на канвасе сами.
+    const pr = pageEl.getBoundingClientRect(), sigs = [];
+    pageEl.querySelectorAll(".sigbox img").forEach(im=>{
+      const r = im.getBoundingClientRect();
+      if(im.src && r.width && r.height) sigs.push({src:im.src, x:r.left-pr.left, y:r.top-pr.top, w:r.width, h:r.height});
+    });
+    const clone = pageEl.cloneNode(true);
+    clone.querySelectorAll(".sigbox img").forEach(im=>im.remove());
+    box.appendChild(clone);
     wrap.appendChild(st); wrap.appendChild(box);
     const xml = new XMLSerializer().serializeToString(wrap);
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'+BOX_W+'" height="'+BOX_H+'">' +
                 '<foreignObject x="0" y="0" width="100%" height="100%">' + xml + '</foreignObject></svg>';
     const img = new Image();
-    img.onload = ()=>{
+    const loadSig = src => new Promise(res=>{ const i = new Image(); i.onload = ()=>res(i); i.onerror = ()=>res(null); i.src = src; });
+    img.onload = async ()=>{
       try{
         const cv = document.createElement("canvas");
         cv.width = BOX_W*scale; cv.height = BOX_H*scale;
         const cx = cv.getContext("2d");
         cx.fillStyle = "#fff"; cx.fillRect(0,0,cv.width,cv.height);
         cx.drawImage(img, 0, 0, cv.width, cv.height);
+        for(const sg of sigs){
+          const si = await loadSig(sg.src);
+          if(si) cx.drawImage(si, sg.x*scale, sg.y*scale, sg.w*scale, sg.h*scale);
+        }
         const d = cv.toDataURL("image/jpeg", 0.92).split(",")[1];
         const bin = atob(d), u = new Uint8Array(bin.length);
         for(let i=0;i<bin.length;i++) u[i] = bin.charCodeAt(i);
@@ -2283,15 +2297,7 @@ async function exportPdf(){
     await new Promise(r=>setTimeout(r,30));
     const pages = Array.from(document.querySelectorAll("#print .page"));
     const imgs = [];
-    // прогрев: декодируем подписи заранее (WebKit иначе рисует их пустыми с первого раза)
-    await Promise.all(Array.from(document.querySelectorAll("#print .sigbox img")).map(i=>{
-      const t = new Image(); t.src = i.src; return t.decode ? t.decode().catch(()=>{}) : 0;
-    }));
-    for(const pg of pages){
-      await pageToJpeg(pg, 1);                 // холостой прогон — вложенные картинки попадают в кэш
-      await new Promise(r=>setTimeout(r,50));
-      imgs.push(await pageToJpeg(pg, 3));      // настоящий кадр, подпись уже на месте
-    }
+    for(const pg of pages) imgs.push(await pageToJpeg(pg, 3));
     const nm = "Karta_" + ((C && C.name) || "drogowa").replace(/[^\wА-Яа-яЁё.-]+/g,"_") + ".pdf";
     showPdfSheet(makePdf(imgs), nm);
   }catch(e){
