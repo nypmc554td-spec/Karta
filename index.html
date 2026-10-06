@@ -307,7 +307,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v52</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v53</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPrintNative" title="Обычная печать Safari">Печать</button>
@@ -2283,7 +2283,15 @@ async function exportPdf(){
     await new Promise(r=>setTimeout(r,30));
     const pages = Array.from(document.querySelectorAll("#print .page"));
     const imgs = [];
-    for(const pg of pages) imgs.push(await pageToJpeg(pg, 3));
+    // прогрев: декодируем подписи заранее (WebKit иначе рисует их пустыми с первого раза)
+    await Promise.all(Array.from(document.querySelectorAll("#print .sigbox img")).map(i=>{
+      const t = new Image(); t.src = i.src; return t.decode ? t.decode().catch(()=>{}) : 0;
+    }));
+    for(const pg of pages){
+      await pageToJpeg(pg, 1);                 // холостой прогон — вложенные картинки попадают в кэш
+      await new Promise(r=>setTimeout(r,50));
+      imgs.push(await pageToJpeg(pg, 3));      // настоящий кадр, подпись уже на месте
+    }
     const nm = "Karta_" + ((C && C.name) || "drogowa").replace(/[^\wА-Яа-яЁё.-]+/g,"_") + ".pdf";
     showPdfSheet(makePdf(imgs), nm);
   }catch(e){
