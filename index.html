@@ -307,7 +307,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v55</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v56</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPrintNative" title="Обычная печать Safari">Печать</button>
@@ -347,23 +347,69 @@ svg.bchart{height:15px}
 
 /* ================= Хранилище: работает и в приложении Claude, и в Safari ================= */
 const Store = {
+  _p:null,
+  _open(){
+    if(Store._p) return Store._p;
+    Store._p = new Promise(res=>{
+      try{
+        const rq = indexedDB.open("karta_db", 1);
+        rq.onupgradeneeded = ()=>{ rq.result.createObjectStore("kv"); };
+        rq.onsuccess = ()=>res(rq.result);
+        rq.onerror = ()=>res(null);
+        rq.onblocked = ()=>res(null);
+      }catch(e){ res(null); }
+    });
+    return Store._p;
+  },
+  async _idb(mode, fn){
+    const db = await Store._open(); if(!db) throw new Error("noidb");
+    return new Promise((res,rej)=>{
+      const tx = db.transaction("kv", mode); const st = tx.objectStore("kv");
+      const rq = fn(st);
+      tx.oncomplete = ()=>res(rq && rq.result);
+      tx.onerror = tx.onabort = ()=>rej(tx.error||new Error("tx"));
+    });
+  },
   async get(k){
     try{ if(window.storage){ const r = await window.storage.get(k,false); return r? r.value : null; } }catch(e){}
-    try{ return localStorage.getItem(k); }catch(e){}
+    try{ const v = await Store._idb("readonly", st=>st.get(k)); if(v!=null) return v; }catch(e){}
+    try{ return localStorage.getItem(k); }catch(e){}   // старые данные до переезда
     return (Store._m && Store._m[k]) || null;
   },
   async set(k,v){
     try{ if(window.storage){ await window.storage.set(k,v,false); return true; } }catch(e){}
+    try{
+      await Store._idb("readwrite", st=>st.put(v,k));
+      try{ localStorage.removeItem(k); }catch(e){}      // освобождаем старое место
+      return true;
+    }catch(e){}
     try{ localStorage.setItem(k,v); return true; }catch(e){}
     Store._m = Store._m || {}; Store._m[k]=v; return false; // НЕ записалось на устройство
   },
   async del(k){
     try{ if(window.storage){ await window.storage.delete(k,false); } }catch(e){}
+    try{ await Store._idb("readwrite", st=>st.delete(k)); }catch(e){}
     try{ localStorage.removeItem(k); }catch(e){}
   }
 };
 try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 const KEY = "kd_v1";
+const PEND = "kd_pending_v1"; // быстрая запись при закрытии приложения
+/* Подписи (большие картинки) хранятся один раз, а в картах — только ссылка */
+function sigHash(str){ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); } return (h>>>0).toString(36)+str.length.toString(36); }
+function packDB(db){
+  const t = {};
+  const d = JSON.stringify(db, (k,v)=>{
+    if(typeof v==="string" && v.length>300 && v.startsWith("data:image")){ const id=sigHash(v); t[id]=v; return "@img:"+id; }
+    return v;
+  });
+  return JSON.stringify({v:2, t:t, d:d});
+}
+function unpackDB(raw){
+  const o = JSON.parse(raw);
+  if(!o || o.v!==2) return o;           // старый формат
+  return JSON.parse(o.d, (k,v)=> (typeof v==="string" && v.startsWith("@img:")) ? (o.t[v.slice(5)]||"") : v);
+}
 const SNAP = "kd_snap_v1";   // копии внутри устройства
 const LASTB = "kd_lastb_v1";  // когда последний раз выгружали файл
 
@@ -594,7 +640,7 @@ function save(now){
   clearTimeout(saveT);
   const go = async ()=>{
     saveT = null;
-    const data = JSON.stringify(DB);
+    const data = packDB(DB);
     let ok = await Store.set(KEY, data);
     if(!ok){
       // место кончилось — удаляем внутренние снимки и пробуем ещё раз
@@ -602,6 +648,7 @@ function save(now){
       ok = await Store.set(KEY, data);
     }
     if(ok){
+      try{ localStorage.removeItem(PEND); }catch(e){}
       $("#saveState").textContent = T("сохранено " + nowHM());
       snapshot();
     }else{
@@ -613,7 +660,12 @@ function save(now){
 }
 // сразу сохранить, если приложение закрывают/сворачивают, пока таймер ещё не сработал
 function flushSave(){
-  if(saveT){ clearTimeout(saveT); saveT = null; try{ Store.set(KEY, JSON.stringify(DB)); }catch(e){} }
+  if(saveT){ clearTimeout(saveT); saveT = null; 
+    try{ const d = packDB(DB);
+      try{ localStorage.setItem(PEND, d); }catch(e){}      // синхронно — успеет при закрытии
+      Store.set(KEY, d).then(ok=>{ if(ok){ try{ localStorage.removeItem(PEND); }catch(e){} } });
+    }catch(e){}
+  }
 }
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState === "hidden") flushSave(); });
 window.addEventListener("pagehide", flushSave);
@@ -1558,7 +1610,7 @@ async function restoreSnap(i){
     const raw = await Store.get(SNAP); const box = JSON.parse(raw);
     const item = box.items[i]; if(!item) return;
     await snapshot();
-    DB = JSON.parse(item.data);
+    DB = unpackDB(item.data);
     C = DB.cards.find(c=>c.id===DB.active) || DB.cards[0];
     DB.active = C.id;
     save(true); renderAll(); toast("Восстановлено");
@@ -1846,8 +1898,8 @@ async function snapshot(){
     const now = Date.now();
     const last = box.items[0];
     if(last && (now - last.t) < 6*3600000) box.items.shift(); // не чаще раза в 6 часов
-    box.items.unshift({t: now, data: JSON.stringify(DB)});
-    box.items = box.items.slice(0,2);
+    box.items.unshift({t: now, data: packDB(DB)});
+    box.items = box.items.slice(0,3);
     // снимки второстепенны: если не влезли — удаляем их, основные данные важнее
     const ok = await Store.set(SNAP, JSON.stringify(box));
     if(!ok) await Store.del(SNAP);
@@ -2347,8 +2399,11 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
 
 /* ================= Старт ================= */
 (async function init(){
-  const raw = await Store.get(KEY);
-  if(raw){ try{ DB = JSON.parse(raw); }catch(e){ DB={cards:[],active:""}; } }
+  let raw = await Store.get(KEY);
+  let pend = null; try{ pend = localStorage.getItem(PEND); }catch(e){}
+  if(pend){ raw = pend; }                 // не успели записать при закрытии — берём свежее
+  if(raw){ try{ DB = unpackDB(raw); }catch(e){ DB={cards:[],active:""}; } }
+  if(pend){ try{ await Store.set(KEY, pend); localStorage.removeItem(PEND); }catch(e){} }
   if(!DB.mycards) DB.mycards = {fuel:[], bank:[]};
   if(!DB.mycards.fuel) DB.mycards.fuel = [];
   if(!DB.mycards.bank) DB.mycards.bank = [];
