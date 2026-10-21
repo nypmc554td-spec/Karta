@@ -307,7 +307,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v54</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v55</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPrintNative" title="Обычная печать Safari">Печать</button>
@@ -355,9 +355,14 @@ const Store = {
   async set(k,v){
     try{ if(window.storage){ await window.storage.set(k,v,false); return true; } }catch(e){}
     try{ localStorage.setItem(k,v); return true; }catch(e){}
-    Store._m = Store._m || {}; Store._m[k]=v; return true;
+    Store._m = Store._m || {}; Store._m[k]=v; return false; // НЕ записалось на устройство
+  },
+  async del(k){
+    try{ if(window.storage){ await window.storage.delete(k,false); } }catch(e){}
+    try{ localStorage.removeItem(k); }catch(e){}
   }
 };
+try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 const KEY = "kd_v1";
 const SNAP = "kd_snap_v1";   // копии внутри устройства
 const LASTB = "kd_lastb_v1";  // когда последний раз выгружали файл
@@ -588,12 +593,30 @@ function save(now){
   $("#saveState").textContent = T("сохраняю…");
   clearTimeout(saveT);
   const go = async ()=>{
-    await Store.set(KEY, JSON.stringify(DB));
-    snapshot();
-    $("#saveState").textContent = T("сохранено " + nowHM());
+    saveT = null;
+    const data = JSON.stringify(DB);
+    let ok = await Store.set(KEY, data);
+    if(!ok){
+      // место кончилось — удаляем внутренние снимки и пробуем ещё раз
+      await Store.del(SNAP);
+      ok = await Store.set(KEY, data);
+    }
+    if(ok){
+      $("#saveState").textContent = T("сохранено " + nowHM());
+      snapshot();
+    }else{
+      $("#saveState").textContent = T("⚠ НЕ СОХРАНЕНО");
+      toast("Память заполнена — данные НЕ сохранены! Сделай копию в файл (Инфо).");
+    }
   };
   if(now) go(); else saveT = setTimeout(go, 400);
 }
+// сразу сохранить, если приложение закрывают/сворачивают, пока таймер ещё не сработал
+function flushSave(){
+  if(saveT){ clearTimeout(saveT); saveT = null; try{ Store.set(KEY, JSON.stringify(DB)); }catch(e){} }
+}
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState === "hidden") flushSave(); });
+window.addEventListener("pagehide", flushSave);
 
 /* ================= Определение страны/города по GPS ================= */
 const BOX = [ /* [код, latMin, latMax, lonMin, lonMax] */
@@ -1824,8 +1847,10 @@ async function snapshot(){
     const last = box.items[0];
     if(last && (now - last.t) < 6*3600000) box.items.shift(); // не чаще раза в 6 часов
     box.items.unshift({t: now, data: JSON.stringify(DB)});
-    box.items = box.items.slice(0,3);
-    await Store.set(SNAP, JSON.stringify(box));
+    box.items = box.items.slice(0,2);
+    // снимки второстепенны: если не влезли — удаляем их, основные данные важнее
+    const ok = await Store.set(SNAP, JSON.stringify(box));
+    if(!ok) await Store.del(SNAP);
   }catch(e){}
 }
 
