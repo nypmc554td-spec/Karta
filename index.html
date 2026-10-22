@@ -307,7 +307,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v56</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v58</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPrintNative" title="Обычная печать Safari">Печать</button>
@@ -1909,7 +1909,7 @@ async function snapshot(){
 function backupBlob(){
   return new Blob([JSON.stringify(DB, null, 2)], {type:"application/json"});
 }
-function backupName(){ return "karta-" + todayISO() + ".json"; }
+function backupName(){ return "karta-" + todayISO().slice(0,7) + ".json"; } // один файл на месяц
 
 async function saveBackupFile(silent){
   try{
@@ -1961,15 +1961,12 @@ function renderWarn(){
     <button id="warnBk">Сделать</button>`;
 }
 
-// Раз в сутки сама выгружает файл в Загрузки
+// Автовыгрузка отключена — только напоминание
 async function maybeAutoBackup(){
   await loadBackupState();
   renderWarn();
-  if(!hasData()) return;
-  if(Date.now() - lastBackupTs > DAY){
-    const ok = await saveBackupFile(true);
-    if(ok){ lastBackupTs = Date.now(); toast("Копия сохранена в Загрузки"); }
-  }
+  // Файлы сами больше не выгружаются (из-за них копились дубли).
+  // Только напоминание сверху через 3 дня — копию делаешь кнопкой «Сохранить копию сейчас».
 }
 
 /* ================= События ================= */
