@@ -307,7 +307,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v58</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v59</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPrintNative" title="Обычная печать Safari">Печать</button>
@@ -1930,7 +1930,7 @@ async function shareBackup(){
   const file = new File([backupBlob()], backupName(), {type:"application/json"});
   try{
     if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], title:"Karta drogowa — копия"});
+      await navigator.share({files:[file]}); // без title/text — иначе iOS сохраняет лишний «текст»
       await Store.set(LASTB, String(Date.now()));
       renderWarn();
       return;
@@ -2356,7 +2356,7 @@ function showPdfSheet(blob, name){
   ov.querySelector("#pdfOpen").onclick = ()=>{ const w = window.open(url, "_blank"); if(!w) location.href = url; };
   ov.querySelector("#pdfShare").onclick = async ()=>{
     try{
-      if(navigator.canShare && navigator.canShare({files:[file]})) await navigator.share({files:[file], title:name});
+      if(navigator.canShare && navigator.canShare({files:[file]})) await navigator.share({files:[file]});
       else { const w = window.open(url, "_blank"); if(!w) location.href = url; }
     }catch(e){ if(e && e.name !== "AbortError") toast("Не вышло — жми «Открыть PDF»"); }
   };
