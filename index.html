@@ -377,7 +377,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v72</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v74</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPrintNative" title="Обычная печать Safari">Печать</button>
@@ -2081,14 +2081,14 @@ function cabotage(){
         const zd = dnum(Z[0].zd), wd = dnum(W[W.length-1].wd), d = zd!=null ? zd : wd;
         if(d == null) return;
         const z0 = Z[0], w9 = W[W.length-1];
-        ev.push({t:"dom", c:c, v:veh, d:d, e:(wd!=null?wd:d), i:i, cur:cur, tie:1,
+        ev.push({t:"dom", c:c, v:veh, cn:card.name||"", d:d, e:(wd!=null?wd:d), i:i, cur:cur, tie:1,
           nr:r.nr||"", zm:z0.zm||"", wm:w9.wm||"", zd:z0.zd||"", wd:w9.wd||""});
       }else{
         W.forEach(w=>{
           const c = cabC(w.wk);
           if([...Lc].some(x=>x!==c)){
             const d = dnum(w.wd)!=null ? dnum(w.wd) : dnum(Z[0].zd);
-            if(d != null && c !== "PL") ev.push({t:"int", c:c, v:veh, d:d, i:i, cur:cur, tie:0,
+            if(d != null && c !== "PL") ev.push({t:"int", c:c, v:veh, cn:card.name||"", d:d, i:i, cur:cur, tie:0,
               nr:r.nr||"", from:[...Lc].find(x=>x!==c)||"", city:w.wm||""});
           }
         });
@@ -2123,7 +2123,7 @@ function cabotage(){
           if(e.d - last <= rule.cool){ add(e.cur,"r", nm+": пауза "+rule.cool+" дн. после прошлого каботажа (до "+dfmt(last+rule.cool)+")"); bad = true;
             why.push("после прошлого каботажа ("+dfmt(last)+") ещё не прошла пауза "+rule.cool+" дн. — каботаж можно с "+dfmt(last+rule.cool+1)); }
         }
-        g.ops.push({d:e.d, e:e.e, cur:e.cur, bad:bad, why:why, nr:e.nr, zm:e.zm, wm:e.wm, zd:e.zd, wd:e.wd});
+        g.ops.push({d:e.d, e:e.e, cur:e.cur, bad:bad, why:why, cn:e.cn, nr:e.nr, zm:e.zm, wm:e.wm, zd:e.zd, wd:e.wd});
         label = (bad?"⚠ ":"")+"каботаж "+n+"/"+rule.max;
       }
     }
@@ -2148,7 +2148,9 @@ function cabotage(){
   });
   if(newest) info.push({lvl:"i", txt:newest.nm+": можно до "+newest.rule.max+" каботажей, последняя выгрузка до "+dfmt(newest.g.start+newest.rule.days)});
   const groups = [];
-  Object.keys(st).forEach(k=>{ const s = st[k], c = s.c; s.closed.concat(s.g ? [s.g] : []).forEach(g=>groups.push({c:c, g:g, rule:cabRule(c)})); if(s.ban) groups.push({c:c, ban:s.ban, rule:cabRule(c)}); });
+  Object.keys(st).forEach(k=>{ const s = st[k], c = s.c, arr = s.closed.concat(s.g ? [s.g] : []);
+    arr.forEach((g,ix)=>groups.push({c:c, g:g, rule:cabRule(c), prev:(ix>0 ? arr[ix-1] : null)}));
+    if(s.ban) groups.push({c:c, ban:s.ban, rule:cabRule(c)}); });
   return {rows:rows, issues:issues, info:info, groups:groups, today:today};
 }
 
@@ -2163,6 +2165,11 @@ function whyPl(arr){
     if((m = /^после прошлого каботажа \((\d\d\.\d\d)\) ещё не прошла пауза (\d+) дн\. — каботаж можно с (\d\d\.\d\d)$/.exec(t))) return "po poprzednim kabotażu ("+m[1]+") nie minęła przerwa "+m[2]+" dni — kabotaż możliwy od "+m[3];
     return t;
   }).join("; ");
+}
+function prevRel(x){
+  const pv = x.prev; if(!pv || !pv.ops.length) return null;
+  const lastEnd = pv.ops[pv.ops.length-1].e;
+  return (x.g.start - lastEnd) <= 7 ? pv : null;
 }
 function printCab(){
   LG = "pl";
@@ -2199,10 +2206,12 @@ function printCab(){
     let verdict;
     if(viol) verdict = box("bad","<b>Uwaga — naruszenie zasad kabotażu</b> (zaznaczone „!” w tabeli). Wykorzystano "+n+" z "+rule.max+" operacji."+
       g.ops.filter(o=>o.bad && o.why && o.why.length).map(o=>"<div>• zlec. "+esc(o.nr||"")+" ("+esc(fmtD(isoOf(o.d)))+"): "+esc(whyPl(o.why))+"</div>").join(""));
-    else if(open) verdict = box("warn","<b>Wykorzystano "+n+" z "+rule.max+" operacji.</b> Można jeszcze "+(rule.max-n)+" — ostatni rozładunek najpóźniej <b>"+D_(dl)+"</b>.");
-    else verdict = box("ok","<b>Wykorzystano "+n+" z "+rule.max+" operacji.</b> "+(n >= rule.max ? "Limit wykorzystany." : "Okno kabotażu zamknięte ("+D_(dl)+").")+
+    else if(open) verdict = box("warn","<b>Wykorzystano "+n+" z "+rule.max+" operacji. Pozostało: "+(rule.max-n)+".</b> Ostatni rozładunek najpóźniej <b>"+D_(dl)+"</b>.");
+    else verdict = box("ok","<b>Wykorzystano "+n+" z "+rule.max+" operacji. Pozostało: "+Math.max(0,rule.max-n)+".</b> "+(n >= rule.max ? "Limit wykorzystany." : "Okno kabotażu zamknięte ("+D_(dl)+").")+
       (rule.cool && lastEnd != null ? " Kolejny kabotaż w kraju "+esc(nm)+" możliwy od <b>"+D_(lastEnd + rule.cool + 1)+"</b>." : " Kolejny kabotaż możliwy po nowej dostawie międzynarodowej."));
+    const pv = prevRel(x);
     body += '<div class="itoh">'+esc(nm)+'</div>' +
+      (pv ? '<div class="itonote" style="font-size:8.5pt;margin:2px 0 0"><b>Poprzedni kabotaż w tym kraju</b> (ten sam pojazd'+(pv.ops[0].cn?', karta: '+esc(pv.ops[0].cn):'')+'; dostawa międzynarodowa '+esc(D_(pv.start))+'):</div>' + opTab(pv.ops.map(o=>Object.assign({}, o, {bad:false}))) + '<div style="height:6px"></div>' : '') +
       '<table class="nb itotab">' +
         '<tr><td style="border:none;padding:2px 0">Dostawa międzynarodowa</td><td style="border:none;padding:2px 0;text-align:right">'+esc(D_(g.start))+(g.from?" · "+esc(krajName(g.from))+" → "+esc(nm)+(g.city?" ("+esc(g.city)+")":""):"")+(g.nr?" · zlec. "+esc(g.nr):"")+'</td></tr>' +
         '<tr><td style="border:none;padding:2px 0">Okno kabotażu ('+rule.days+' dni)</td><td style="border:none;padding:2px 0;text-align:right">'+esc(D_(g.start))+' – '+esc(D_(dl))+'</td></tr>' +
@@ -2213,7 +2222,7 @@ function printCab(){
     '<div class="itohead"><div><div class="itotitle">Kabotaż — zestawienie</div>' +
       '<div class="itosub">' + esc(C.name || "") + ' · stan na ' + esc(fmtD(todayISO())) + '</div></div>' +
       '<div class="itosub" style="text-align:right">' + esc(h.nrRej || "") + '<br>' + esc(kier) + '</div></div>' +
-    body + winsHtml +
+    body +
     '<div class="itofoot">UE i Norwegia (rozp. (UE) 2020/1055): po dostawie międzynarodowej do 3 operacji kabotażowych w ciągu 7 dni, następnie 4 dni przerwy w tym samym kraju. ' +
       'Wielka Brytania: do 2 operacji w ciągu 7 dni. Szwajcaria: kabotaż zabroniony. Zestawienie sporządzone na podstawie wpisów kierowcy w karcie drogowej; dokumenty potwierdzające: CMR i zlecenia.</div>' +
     sigBlock() + '</div>';
@@ -2278,6 +2287,7 @@ function renderCabPane(r){
       '<div class="dots">'+dots+'<small>'+n+' из '+rule.max+'</small></div>' +
       '<div class="strip">'+strip+'</div>' +
       '<div class="verdict">'+verdict+'</div>' +
+      (prevRel(x) ? '<div class="verdict" style="font-size:12.5px;color:var(--dim)">Прошлый каботаж в этой стране (та же машина'+(prevRel(x).ops[0].cn?', карта «'+esc(prevRel(x).ops[0].cn)+'»':'')+'): '+prevRel(x).ops.map(o=>esc(dfmt(o.d))).join(", ")+'.</div>' : '') +
       (n ? '<div class="ops">'+g.ops.map((o,k)=>'<div><i>'+(k+1)+'. '+esc(dfmt(o.d))+'</i><span>'+esc(o.nr||"—")+' · '+esc(o.zm||"?")+' → '+esc(o.wm||"?")+'</span></div>').join("")+'</div>' : '') +
       '</div>';
   });
