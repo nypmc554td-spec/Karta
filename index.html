@@ -377,7 +377,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v68</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v69</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPrintNative" title="Обычная печать Safari">Печать</button>
@@ -2085,7 +2085,7 @@ function cabotage(){
           const c = cabC(w.wk);
           if([...Lc].some(x=>x!==c)){
             const d = dnum(w.wd)!=null ? dnum(w.wd) : dnum(Z[0].zd);
-            if(d != null) ev.push({t:"int", c:c, d:d, i:i, cur:cur, tie:0,
+            if(d != null && c !== "PL") ev.push({t:"int", c:c, d:d, i:i, cur:cur, tie:0,
               nr:r.nr||"", from:[...Lc].find(x=>x!==c)||"", city:w.wm||""});
           }
         });
@@ -2155,7 +2155,7 @@ function printCab(){
     if(x.ban) return x.ban.some(o=>o.cur);
     const g = x.g;
     if(g.ops.some(o=>o.cur)) return true;
-    return g.cur && x.rule.days != null && (g.start + x.rule.days - r.today) >= 0;   // открытое окно без операций
+    return false;
   }).sort((a,b)=> (a.ban ? a.ban[0].d : a.g.start) - (b.ban ? b.ban[0].d : b.g.start));
   const opRows = ops => ops.map((o,k)=>'<tr><td class="c">'+(k+1)+'</td><td>'+esc(o.nr||"—")+'</td><td>'+esc(fmtD(o.zd)||D_(o.d))+'</td><td>'+esc(o.zm||"—")+'</td><td>'+esc(o.wm||"—")+'</td><td>'+esc(fmtD(o.wd)||D_(o.e))+'</td><td class="c">'+(o.bad?"<b>!</b>":"")+'</td></tr>').join("");
   const opTab = ops => '<table class="cabtab"><tr><th style="width:6%">Lp</th><th style="width:16%">Nr zlecenia</th><th style="width:15%">Data załadunku</th><th>Załadunek</th><th>Wyładunek</th><th style="width:15%">Data wyładunku</th><th style="width:5%"></th></tr>'+opRows(ops)+'</table>';
@@ -2164,6 +2164,10 @@ function printCab(){
   if(!showG.length){
     body = box("ok","<b>Brak kabotażu</b> w tej karcie — nie wykryto przewozów krajowych poza Polską.");
   }
+  const winsP = r.groups.filter(x=> !x.ban && x.rule.days != null && x.g.ops.length===0 && x.g.cur && (x.g.start + x.rule.days - r.today) >= 0)
+    .sort((a,b)=> (a.g.start + a.rule.days) - (b.g.start + b.rule.days));
+  const winsHtml = winsP.length ? '<div class="itoh">Otwarte okna kabotażu (jeszcze bez operacji)</div><table class="cabtab"><tr><th>Kraj</th><th style="width:26%">Dostawa międzynarodowa</th><th style="width:26%">Kabotaż możliwy do</th><th style="width:14%">Limit</th></tr>' +
+    winsP.map(x=>'<tr><td>'+esc(krajName(x.c))+'</td><td>'+esc(D_(x.g.start))+'</td><td><b>'+esc(D_(x.g.start + x.rule.days))+'</b></td><td class="c">'+x.rule.max+'</td></tr>').join("") + '</table>' : "";
   showG.forEach(x=>{
     const nm = krajName(x.c);
     if(x.ban){
@@ -2190,7 +2194,7 @@ function printCab(){
     '<div class="itohead"><div><div class="itotitle">Kabotaż — zestawienie</div>' +
       '<div class="itosub">' + esc(C.name || "") + ' · stan na ' + esc(fmtD(todayISO())) + '</div></div>' +
       '<div class="itosub" style="text-align:right">' + esc(h.nrRej || "") + '<br>' + esc(kier) + '</div></div>' +
-    body +
+    body + winsHtml +
     '<div class="itofoot">UE i Norwegia (rozp. (UE) 2020/1055): po dostawie międzynarodowej do 3 operacji kabotażowych w ciągu 7 dni, następnie 4 dni przerwy w tym samym kraju. ' +
       'Wielka Brytania: do 2 operacji w ciągu 7 dni. Szwajcaria: kabotaż zabroniony. Zestawienie sporządzone na podstawie wpisów kierowcy w karcie drogowej; dokumenty potwierdzające: CMR i zlecenia.</div>' +
     sigBlock() + '</div>';
@@ -2209,18 +2213,22 @@ function flagOf(c){ try{ return c && c.length===2 ? String.fromCodePoint.apply(n
 function renderCabPane(r){
   const el = $("#pane-cab"); if(!el) return;
   const D_ = n => fmtD(isoOf(n));
-  const groups = r.groups.filter(x=>{
-    if(x.ban) return x.ban.some(o=>o.cur);
-    return x.g.ops.some(o=>o.cur) || (x.g.cur && (x.g.start + x.rule.days - r.today) >= 0);
-  }).sort((a,b)=> (b.ban ? b.ban[0].d : b.g.start) - (a.ban ? a.ban[0].d : a.g.start));
+  const groups = r.groups.filter(x=> x.ban ? x.ban.some(o=>o.cur) : x.g.ops.some(o=>o.cur))
+    .sort((a,b)=> (b.ban ? b.ban[0].d : b.g.start) - (a.ban ? a.ban[0].d : a.g.start));
+  const wins = r.groups.filter(x=> !x.ban && x.rule.days != null && x.g.ops.length===0 && x.g.cur && (x.g.start + x.rule.days - r.today) >= 0)
+    .sort((a,b)=> (a.g.start + a.rule.days) - (b.g.start + b.rule.days));
+  const winCard = wins.length ? '<div class="cabg"><div class="gh"><span class="gn" style="font-size:15px">Открытые окна</span></div>' +
+    '<div class="verdict" style="font-size:12.5px;color:var(--dim)">Была международная доставка, каботажа пока не было. Можно до указанной даты.</div>' +
+    '<div class="ops">' + wins.map(x=>'<div><i>'+flagOf(x.c)+'</i><span><b>'+esc(krajName(x.c))+'</b> — до '+esc(D_(x.g.start + x.rule.days))+' · до '+x.rule.max+' операций</span></div>').join("") + '</div></div>' : "";
   const intro = '<p class="cabintro"><b>Каботаж</b> — перевозка внутри чужой страны (не Польши) после международной доставки в неё. ' +
     'ЕС и Норвегия: до 3 операций за 7 дней, потом пауза 4 дня. Англия: до 2 за 7 дней. Швейцария: запрещён. ' +
     'Считается сам по странам и датам из Trasa.</p>';
-  if(!groups.length){
+  if(!groups.length && !wins.length){
     el.innerHTML = '<div class="card"><h3>Каботаж</h3><p class="hint" style="font-size:14px">Пока каботажа нет. Заполни в Trasa страны и даты загрузки и выгрузки — здесь всё посчитается само.</p></div>' + intro;
     return;
   }
   let html = '<button class="btn primary" id="btnCabPrint" style="width:100%;margin:10px 0 0">Лист для координатора</button>';
+  if(!groups.length) html += '<div class="card"><h3>Каботаж</h3><p class="hint" style="font-size:14px">Каботажа пока не было — только международные доставки. Правила будут считаться, когда появится перевозка внутри чужой страны.</p></div>';
   groups.forEach(x=>{
     const nm = krajName(x.c), fl = flagOf(x.c);
     if(x.ban){
@@ -2253,7 +2261,7 @@ function renderCabPane(r){
       (n ? '<div class="ops">'+g.ops.map((o,k)=>'<div><i>'+(k+1)+'. '+esc(dfmt(o.d))+'</i><span>'+esc(o.nr||"—")+' · '+esc(o.zm||"?")+' → '+esc(o.wm||"?")+'</span></div>').join("")+'</div>' : '') +
       '</div>';
   });
-  el.innerHTML = html + intro;
+  el.innerHTML = html + winCard + intro;
 }
 
 function renderCab(){
