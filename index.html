@@ -85,6 +85,33 @@ textarea{min-height:90px;line-height:1.35}
   border-radius:9px;padding:0 10px;font-size:12px;font-weight:700;cursor:pointer;min-height:44px;
 }
 .mini:active{background:var(--panel2)}
+/* ---------- Вкладка «Карта» — как печатный бланк ---------- */
+.frm{border:1.5px solid #2a2f36;border-radius:8px;background:#fff;margin:10px 0;overflow:hidden}
+.frm .r{display:grid;border-top:1px solid #8d939c}
+.frm .r:first-child{border-top:none}
+.frm .c1{grid-template-columns:1fr}
+.frm .c2{grid-template-columns:1fr 1fr}
+.frm .c4{grid-template-columns:repeat(4,1fr)}
+.frm .r > *{border-left:1px solid #8d939c;min-width:0}
+.frm .r > :first-child{border-left:none}
+.frm .hd{background:#EDEFF2;font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:12.5px;
+  text-align:center;padding:7px 6px;line-height:1.25}
+.frm .hd.s2{grid-column:span 2}
+.frm .fc{display:block;padding:6px 6px 7px}
+.frm .fc .pl{display:block;font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:12.5px;line-height:1.2;color:#15181c}
+.frm .fc small{display:block;color:var(--dim);font-size:10.5px;line-height:1.2;margin:1px 0 0}
+.frm .fc input{margin-top:5px;padding:9px 6px;border-radius:7px}
+.frm .c4 .fc{padding:5px 4px 6px}
+.frm .c4 .fc .pl{font-weight:400;font-style:italic;text-align:center;font-size:11.5px}
+.frm .c4 .fc input{text-align:center;padding:9px 2px}
+.frm .fc .now{padding:0 7px;font-size:11.5px}
+.frm .fc .row2{gap:5px}
+.frm .fc .row2 input{min-width:0;width:auto;flex:1 1 0}
+.frm .fc .row2{margin-top:5px}
+.frm .fc .row2 input{margin-top:0}
+.decl2{background:#FFF;text-align:center;font-weight:700;font-size:10.5px;letter-spacing:.02em;padding:7px 6px;color:#7A1710;
+  border:1.5px solid #2a2f36;border-radius:8px;margin:10px 0}
+.frmh{font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:14px;margin:14px 2px 0}
 .item{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;margin:8px 0}
 /* мягкая заливка строк: жёлтая — не закрыта, зелёная — заполнено всё */
 .item[data-row].todo{background:#FFFFFF;border-color:#D3D6DB}
@@ -307,7 +334,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v61</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v64</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPrintNative" title="Обычная печать Safari">Печать</button>
@@ -796,47 +823,72 @@ function renderTabs(){
   document.querySelectorAll(".pane").forEach(p=>p.classList.toggle("on", p.id==="pane-"+activeTab));
 }
 
+/* --- ячейки «как на бланке» --- */
+function fcIn(path,pl,ru,extra){
+  return `<label class="fc"><span class="pl">${esc(pl)}</span>${ru?`<small>${esc(ru)}</small>`:""}<input data-p="${path}" value="${esc(getP(C,path))}" ${extra||""}></label>`;
+}
+function fcDT(pd,pt,pl,ru){
+  return `<label class="fc"><span class="pl">${esc(pl)}</span>${ru?`<small>${esc(ru)}</small>`:""}
+    <input type="date" data-p="${pd}" value="${esc(getP(C,pd))}">
+    <div class="row2"><input type="time" data-p="${pt}" value="${esc(getP(C,pt))}">
+    <button class="mini now" data-now="dt|${pd}|${pt}">Сейч.</button></div></label>`;
+}
+function fcGps(pk,pl,ru){
+  return `<label class="fc"><span class="pl">${esc(pl)}</span>${ru?`<small>${esc(ru)}</small>`:""}
+    <div class="row2"><input data-p="${pk}" value="${esc(getP(C,pk))}" placeholder="Kraj">
+    <button class="mini" data-gps="${pk}|">GPS</button></div></label>`;
+}
+function fcKm(path,pl){ return fcIn(path,pl,"",'inputmode="decimal"'); }
+
 function renderMain(){
   $("#pane-main").innerHTML = `
-  <div class="card"><h3>Nagłówek</h3><div class="grid">
-    ${inp("head.nrWyjazdu","Numer Wyjazdu — номер выезда")}
-    ${inp("head.nrTeczki","Numer Teczki — номер папки")}
-    ${inp("head.nrRej","Samochód — Nr rej.")}
-    ${inp("head.paliwo","Rodzaj paliwa")}
-    ${inp("head.k1i","Kierowca 1 — Imię")}
-    ${inp("head.k1n","Kierowca 1 — Nazwisko")}
-    ${inp("head.k2i","Kierowca 2 — Imię")}
-    ${inp("head.k2n","Kierowca 2 — Nazwisko")}
-  </div></div>
-
-  <div class="card"><h3>Bus — выезд с базы</h3><div class="grid">
-    ${dtF("bus.wyjD","bus.wyjG","Wyjazd Busem z bazy — выезд с базы")}
-    ${dtF("bus.przyjSamD","bus.przyjSamG","Przyjazd Busem do samochodu — приезд к тягачу")}
-    ${gpsF("bus.miejsL","","Miejscowość (левая колонка)")}
-  </div></div>
-
-  <div class="card"><h3>Bus — возврат на базу</h3><div class="grid">
-    ${dtF("bus.powrD","bus.powrG","Powrót Busem do Bazy — выезд к базе")}
-    ${dtF("bus.przyjBazD","bus.przyjBazG","Przyjazd Busem do bazy — приезд на базу")}
-    ${gpsF("bus.miejsP","","Miejscowość (правая колонка)")}
-  </div></div>
-
-  <div class="card"><h3>Wyjazd z bazy / Powrót na bazę</h3><div class="grid">
-    ${dtF("baza.wyjD","baza.wyjG","WYJAZD Z BAZY — начало работы")}
-    ${dtF("baza.powrD","baza.powrG","POWRÓT NA BAZĘ — окончание работы")}
-  </div></div>
-
-  <div class="card"><h3>Stany Samochodu</h3>
-    <div class="sub">Stan licznika KM — километраж</div>
-    <div class="grid">${num("stany.kmP","Początek")}${num("stany.kmK","Koniec")}</div>
-    <div class="sub">Stan Paliwa — топливо, %</div>
-    <div class="grid">${num("stany.palP","Początek")}${num("stany.palK","Koniec")}</div>
-    <div class="sub">Stan licznika zużycia paliwa z komputera</div>
-    <div class="grid">${num("stany.kompP","Początek")}${num("stany.kompK","Koniec")}</div>
-    <div class="sub">Stan Ad-Blue — %</div>
-    <div class="grid">${num("stany.adbP","Początek")}${num("stany.adbK","Koniec")}</div>
-    <p class="hint">Показания переписываем с компьютера в тягаче: перед выездом с базы — Początek, после приезда — Koniec.</p>
+  <div class="frm">
+    <div class="r c2">
+      ${fcIn("head.nrWyjazdu","Numer Wyjazdu")}
+      ${fcIn("head.nrTeczki","Numer Teczki")}
+    </div>
+    <div class="r c2">
+      ${fcIn("head.nrRej","Samochód — Nr rej.","госномер")}
+      ${fcIn("head.paliwo","Rodzaj paliwa","вид топлива")}
+    </div>
+    <div class="r c2"><div class="hd">Kierowca 1</div><div class="hd">Kierowca 2</div></div>
+    <div class="r c2">${fcIn("head.k1i","Imię","имя")}${fcIn("head.k2i","Imię","имя")}</div>
+    <div class="r c2">${fcIn("head.k1n","Nazwisko","фамилия")}${fcIn("head.k2n","Nazwisko","фамилия")}</div>
   </div>
+
+  <div class="frm">
+    <div class="r c2">
+      ${fcDT("bus.wyjD","bus.wyjG","Wyjazd Busem z bazy")}
+      ${fcDT("bus.powrD","bus.powrG","Powrót Busem do Bazy")}
+    </div>
+    <div class="r c2">
+      ${fcDT("bus.przyjSamD","bus.przyjSamG","Przyjazd Busem do samochodu")}
+      ${fcDT("bus.przyjBazD","bus.przyjBazG","Przyjazd Busem do bazy")}
+    </div>
+    <div class="r c2">
+      ${fcGps("bus.miejsL","Miejscowość","слева")}
+      ${fcGps("bus.miejsP","Miejscowość","справа")}
+    </div>
+  </div>
+
+  <div class="frm">
+    <div class="r c2"><div class="hd">WYJAZD Z BAZY</div><div class="hd">POWRÓT NA BAZĘ</div></div>
+    <div class="r c2">
+      ${fcDT("baza.wyjD","baza.wyjG","Data / Godzina","начало работы")}
+      ${fcDT("baza.powrD","baza.powrG","Data / Godzina","окончание работы")}
+    </div>
+  </div>
+
+  <div class="decl2">ROZLICZENIE DELEGACJI, TYLKO PO POPRAWNYM WYPEŁNIENIU KARTY DROGOWEJ</div>
+
+  <div class="frmh">Stany Samochodu</div>
+  <div class="frm">
+    <div class="r c4"><div class="hd s2">Stan licznika KM</div><div class="hd s2">Stan Paliwa (%)</div></div>
+    <div class="r c4">${fcKm("stany.kmP","Początek")}${fcKm("stany.kmK","Koniec")}${fcKm("stany.palP","Początek")}${fcKm("stany.palK","Koniec")}</div>
+    <div class="r c4"><div class="hd s2">Stan licznika zużycia paliwa z komputera</div><div class="hd s2">Stan Ad-Blu (%)</div></div>
+    <div class="r c4">${fcKm("stany.kompP","Początek")}${fcKm("stany.kompK","Koniec")}${fcKm("stany.adbP","Początek")}${fcKm("stany.adbK","Koniec")}</div>
+  </div>
+  <p class="hint">Показания переписываем с компьютера в тягаче: перед выездом с базы — Początek, после приезда — Koniec.</p>
 
   <div class="card"><h3>Dodatkowe uwagi</h3>
     <textarea data-p="uwagi" placeholder="Примечания на бланк">${esc(C.uwagi)}</textarea>
