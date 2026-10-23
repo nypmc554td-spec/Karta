@@ -104,7 +104,7 @@ textarea{min-height:90px;line-height:1.35}
 .cabg .dots small{color:var(--dim);font-size:12px;margin-left:4px}
 .cabg .strip{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;margin:10px 0 4px}
 .cabg .sd{border:1px solid #D3D6DB;border-radius:7px;padding:4px 0;text-align:center;font-size:10px;line-height:1.2;color:#5A6069;background:#FAFAFA}
-.cabg .sd b{display:block;font-size:9px;font-weight:700;color:#8A5A00;min-height:11px}
+.cabg .sd b{display:block;font-size:8.5px;white-space:nowrap;font-weight:700;color:#8A5A00;min-height:11px}
 .cabg .sd.dlv{background:#E6F0FB;border-color:#9DBBE0;color:#1D3F66}
 .cabg .sd.dlv b{color:#1D3F66}
 .cabg .sd.op{background:#2F7D4F;border-color:#2F7D4F;color:#fff}
@@ -377,7 +377,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v69</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v72</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPrintNative" title="Обычная печать Safari">Печать</button>
@@ -2064,7 +2064,9 @@ function cabRule(c){
 function dnum(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso||""); return m ? Math.round(Date.UTC(+m[1],+m[2]-1,+m[3])/86400000) : null; }
 function dfmt(n){ const d = new Date(n*86400000); return String(d.getUTCDate()).padStart(2,"0")+"."+String(d.getUTCMonth()+1).padStart(2,"0"); }
 
+function plateOf(card){ return String((card && card.head && card.head.nrRej) || "").toUpperCase().replace(/[^A-Z0-9]/g,""); }
 function cabotage(){
+  const curPlate = plateOf(C);
   const ev = [];
   (DB.cards||[]).forEach(card=>{
     (card.trasa||[]).forEach((r,i)=>{
@@ -2073,19 +2075,20 @@ function cabotage(){
       const Lc = new Set(Z.map(x=>cabC(x.zk))), Uc = new Set(W.map(x=>cabC(x.wk)));
       const all = new Set([...Lc, ...Uc]);
       const cur = card === C;
+      const veh = plateOf(card) || curPlate;   // каботаж считается по машине, не по водителю
       if(all.size === 1){
         const c = [...all][0]; if(c === "PL") return;
         const zd = dnum(Z[0].zd), wd = dnum(W[W.length-1].wd), d = zd!=null ? zd : wd;
         if(d == null) return;
         const z0 = Z[0], w9 = W[W.length-1];
-        ev.push({t:"dom", c:c, d:d, e:(wd!=null?wd:d), i:i, cur:cur, tie:1,
+        ev.push({t:"dom", c:c, v:veh, d:d, e:(wd!=null?wd:d), i:i, cur:cur, tie:1,
           nr:r.nr||"", zm:z0.zm||"", wm:w9.wm||"", zd:z0.zd||"", wd:w9.wd||""});
       }else{
         W.forEach(w=>{
           const c = cabC(w.wk);
           if([...Lc].some(x=>x!==c)){
             const d = dnum(w.wd)!=null ? dnum(w.wd) : dnum(Z[0].zd);
-            if(d != null && c !== "PL") ev.push({t:"int", c:c, d:d, i:i, cur:cur, tie:0,
+            if(d != null && c !== "PL") ev.push({t:"int", c:c, v:veh, d:d, i:i, cur:cur, tie:0,
               nr:r.nr||"", from:[...Lc].find(x=>x!==c)||"", city:w.wm||""});
           }
         });
@@ -2097,7 +2100,8 @@ function cabotage(){
   const st = {}, rows = {}, issues = [];
   const add = (cur, lvl, txt)=>{ if(cur && issues.every(x=>x.txt!==txt)) issues.push({lvl:lvl, txt:txt}); };
   ev.forEach(e=>{
-    const s = st[e.c] || (st[e.c] = {g:null, closed:[]});
+    const key = e.v + "|" + e.c;
+    const s = st[key] || (st[key] = {g:null, closed:[], c:e.c, v:e.v});
     if(e.t === "int"){ if(s.g && s.g.ops.length) s.closed.push(s.g); s.g = {start:e.d, ops:[], cur:e.cur, nr:e.nr, from:e.from, city:e.city}; return; }
     const rule = cabRule(e.c), nm = krajName(e.c);
     let label = "", bad = false;
@@ -2108,15 +2112,18 @@ function cabotage(){
       const g = s.g;
       if(!g){ add(e.cur,"a", nm+": не вижу международной доставки в эту страну перед внутренней перевозкой"); label = "нет доставки?"; }
       else{
-        const n = g.ops.length + 1;
-        if(e.d > g.start + rule.days){ add(e.cur,"r", nm+": прошло больше "+rule.days+" дн. после международной доставки"); bad = true; }
-        if(n > rule.max){ add(e.cur,"r", nm+": "+n+"-я операция, лимит "+rule.max); bad = true; }
+        const n = g.ops.length + 1, why = [];
+        if(e.e > g.start + rule.days){ add(e.cur,"r", nm+": выгрузка позже "+rule.days+" дн. после международной доставки"); bad = true;
+          why.push("выгрузка ("+dfmt(e.e)+") позже "+rule.days+" дней после международной доставки ("+dfmt(g.start)+")"); }
+        if(n > rule.max){ add(e.cur,"r", nm+": "+n+"-я операция, лимит "+rule.max); bad = true;
+          why.push(n+"-я операция, а лимит "+rule.max); }
         const pg = s.closed.length ? s.closed[s.closed.length-1] : null;
         if(rule.cool && pg){
           const last = pg.ops[pg.ops.length-1].e;
-          if(e.d - last <= rule.cool){ add(e.cur,"r", nm+": пауза "+rule.cool+" дн. после прошлого каботажа (до "+dfmt(last+rule.cool)+")"); bad = true; }
+          if(e.d - last <= rule.cool){ add(e.cur,"r", nm+": пауза "+rule.cool+" дн. после прошлого каботажа (до "+dfmt(last+rule.cool)+")"); bad = true;
+            why.push("после прошлого каботажа ("+dfmt(last)+") ещё не прошла пауза "+rule.cool+" дн. — каботаж можно с "+dfmt(last+rule.cool+1)); }
         }
-        g.ops.push({d:e.d, e:e.e, cur:e.cur, bad:bad, nr:e.nr, zm:e.zm, wm:e.wm, zd:e.zd, wd:e.wd});
+        g.ops.push({d:e.d, e:e.e, cur:e.cur, bad:bad, why:why, nr:e.nr, zm:e.zm, wm:e.wm, zd:e.zd, wd:e.wd});
         label = (bad?"⚠ ":"")+"каботаж "+n+"/"+rule.max;
       }
     }
@@ -2126,26 +2133,37 @@ function cabotage(){
   /* что сейчас, на сегодня */
   const today = dnum(todayISO()), info = [];
   let newest = null;
-  Object.keys(st).forEach(c=>{
-    const s = st[c], g = s.g, rule = cabRule(c);
+  Object.keys(st).forEach(k=>{
+    const s = st[k], c = s.c, g = s.g, rule = cabRule(c);
+    if(s.v !== curPlate) return;
     if(!g || rule.ban || rule.unknown) return;
     const nm = krajName(c), left = g.start + rule.days - today;
     if(g.ops.length){
       const opsLeft = rule.max - g.ops.length, lastEnd = g.ops[g.ops.length-1].e, pauseTo = lastEnd + rule.cool;
-      if(opsLeft > 0 && left >= 0) info.push({lvl:"a", txt:nm+": каботаж "+g.ops.length+"/"+rule.max+" · осталось "+opsLeft+" оп., "+left+" дн. (до "+dfmt(g.start+rule.days)+")"});
+      if(opsLeft > 0 && left >= 0) info.push({lvl:"a", txt:nm+": каботаж "+g.ops.length+"/"+rule.max+" · осталось "+opsLeft+" оп., "+left+" дн. (выгрузить до "+dfmt(g.start+rule.days)+")"});
       else if(rule.cool && today <= pauseTo) info.push({lvl:"a", txt:nm+": пауза каботажа до "+dfmt(pauseTo)+" — со следующего дня можно снова"});
     }else if(left >= 0 && (!newest || g.start > newest.g.start)){
       newest = {c:c, g:g, nm:nm, rule:rule};
     }
   });
-  if(newest) info.push({lvl:"i", txt:newest.nm+": можно до "+newest.rule.max+" каботажей до "+dfmt(newest.g.start+newest.rule.days)+" (после международной доставки)"});
+  if(newest) info.push({lvl:"i", txt:newest.nm+": можно до "+newest.rule.max+" каботажей, последняя выгрузка до "+dfmt(newest.g.start+newest.rule.days)});
   const groups = [];
-  Object.keys(st).forEach(c=>{ const s = st[c]; s.closed.concat(s.g ? [s.g] : []).forEach(g=>groups.push({c:c, g:g, rule:cabRule(c)})); if(s.ban) groups.push({c:c, ban:s.ban, rule:cabRule(c)}); });
+  Object.keys(st).forEach(k=>{ const s = st[k], c = s.c; s.closed.concat(s.g ? [s.g] : []).forEach(g=>groups.push({c:c, g:g, rule:cabRule(c)})); if(s.ban) groups.push({c:c, ban:s.ban, rule:cabRule(c)}); });
   return {rows:rows, issues:issues, info:info, groups:groups, today:today};
 }
 
 /* ---------- Лист для координатора: каботаж, факты по датам (по-польски, как лист для офиса) ---------- */
 function isoOf(n){ const d = new Date(n*86400000); return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0"); }
+/* причины в листе — по-польски (в приложении они по-русски) */
+function whyPl(arr){
+  return arr.map(function(t){
+    let m;
+    if((m = /^выгрузка \((\d\d\.\d\d)\) позже (\d+) дней после международной доставки \((\d\d\.\d\d)\)$/.exec(t))) return "rozładunek ("+m[1]+") później niż "+m[2]+" dni po dostawie międzynarodowej ("+m[3]+")";
+    if((m = /^(\d+)-я операция, а лимит (\d+)$/.exec(t))) return m[1]+". operacja, limit to "+m[2];
+    if((m = /^после прошлого каботажа \((\d\d\.\d\d)\) ещё не прошла пауза (\d+) дн\. — каботаж можно с (\d\d\.\d\d)$/.exec(t))) return "po poprzednim kabotażu ("+m[1]+") nie minęła przerwa "+m[2]+" dni — kabotaż możliwy od "+m[3];
+    return t;
+  }).join("; ");
+}
 function printCab(){
   LG = "pl";
   const r = cabotage(), h = C.head;
@@ -2166,7 +2184,7 @@ function printCab(){
   }
   const winsP = r.groups.filter(x=> !x.ban && x.rule.days != null && x.g.ops.length===0 && x.g.cur && (x.g.start + x.rule.days - r.today) >= 0)
     .sort((a,b)=> (a.g.start + a.rule.days) - (b.g.start + b.rule.days));
-  const winsHtml = winsP.length ? '<div class="itoh">Otwarte okna kabotażu (jeszcze bez operacji)</div><table class="cabtab"><tr><th>Kraj</th><th style="width:26%">Dostawa międzynarodowa</th><th style="width:26%">Kabotaż możliwy do</th><th style="width:14%">Limit</th></tr>' +
+  const winsHtml = winsP.length ? '<div class="itoh">Otwarte okna kabotażu (jeszcze bez operacji)</div><table class="cabtab"><tr><th>Kraj</th><th style="width:26%">Dostawa międzynarodowa</th><th style="width:26%">Ostatni rozładunek do</th><th style="width:14%">Limit</th></tr>' +
     winsP.map(x=>'<tr><td>'+esc(krajName(x.c))+'</td><td>'+esc(D_(x.g.start))+'</td><td><b>'+esc(D_(x.g.start + x.rule.days))+'</b></td><td class="c">'+x.rule.max+'</td></tr>').join("") + '</table>' : "";
   showG.forEach(x=>{
     const nm = krajName(x.c);
@@ -2179,8 +2197,9 @@ function printCab(){
     const viol = g.ops.some(o=>o.bad) || n > rule.max;
     const open = (dl - r.today) >= 0 && n < rule.max && !viol;
     let verdict;
-    if(viol) verdict = box("bad","<b>Uwaga — naruszenie zasad kabotażu</b> (zaznaczone „!” w tabeli). Wykorzystano "+n+" z "+rule.max+" operacji.");
-    else if(open) verdict = box("warn","<b>Wykorzystano "+n+" z "+rule.max+" operacji.</b> Można jeszcze "+(rule.max-n)+" do <b>"+D_(dl)+"</b> włącznie.");
+    if(viol) verdict = box("bad","<b>Uwaga — naruszenie zasad kabotażu</b> (zaznaczone „!” w tabeli). Wykorzystano "+n+" z "+rule.max+" operacji."+
+      g.ops.filter(o=>o.bad && o.why && o.why.length).map(o=>"<div>• zlec. "+esc(o.nr||"")+" ("+esc(fmtD(isoOf(o.d)))+"): "+esc(whyPl(o.why))+"</div>").join(""));
+    else if(open) verdict = box("warn","<b>Wykorzystano "+n+" z "+rule.max+" operacji.</b> Można jeszcze "+(rule.max-n)+" — ostatni rozładunek najpóźniej <b>"+D_(dl)+"</b>.");
     else verdict = box("ok","<b>Wykorzystano "+n+" z "+rule.max+" operacji.</b> "+(n >= rule.max ? "Limit wykorzystany." : "Okno kabotażu zamknięte ("+D_(dl)+").")+
       (rule.cool && lastEnd != null ? " Kolejny kabotaż w kraju "+esc(nm)+" możliwy od <b>"+D_(lastEnd + rule.cool + 1)+"</b>." : " Kolejny kabotaż możliwy po nowej dostawie międzynarodowej."));
     body += '<div class="itoh">'+esc(nm)+'</div>' +
@@ -2219,7 +2238,7 @@ function renderCabPane(r){
     .sort((a,b)=> (a.g.start + a.rule.days) - (b.g.start + b.rule.days));
   const winCard = wins.length ? '<div class="cabg"><div class="gh"><span class="gn" style="font-size:15px">Открытые окна</span></div>' +
     '<div class="verdict" style="font-size:12.5px;color:var(--dim)">Была международная доставка, каботажа пока не было. Можно до указанной даты.</div>' +
-    '<div class="ops">' + wins.map(x=>'<div><i>'+flagOf(x.c)+'</i><span><b>'+esc(krajName(x.c))+'</b> — до '+esc(D_(x.g.start + x.rule.days))+' · до '+x.rule.max+' операций</span></div>').join("") + '</div></div>' : "";
+    '<div class="ops">' + wins.map(x=>'<div><i>'+flagOf(x.c)+'</i><span><b>'+esc(krajName(x.c))+'</b> — последняя выгрузка до '+esc(D_(x.g.start + x.rule.days))+' · до '+x.rule.max+' операций</span></div>').join("") + '</div></div>' : "";
   const intro = '<p class="cabintro"><b>Каботаж</b> — перевозка внутри чужой страны (не Польши) после международной доставки в неё. ' +
     'ЕС и Норвегия: до 3 операций за 7 дней, потом пауза 4 дня. Англия: до 2 за 7 дней. Швейцария: запрещён. ' +
     'Считается сам по странам и датам из Trasa.</p>';
@@ -2242,8 +2261,9 @@ function renderCabPane(r){
     const viol = n > rule.max || g.ops.some(o=>o.bad);
     const pauseTo = (rule.cool && lastEnd!=null) ? lastEnd + rule.cool : null;
     let chip, verdict;
-    if(viol){ chip = '<span class="chip rd">Нарушение</span>'; verdict = 'Превышены правила каботажа: операций '+n+' из '+rule.max+' (красные отметки). Покажи координатору лист.'; }
-    else if(n < rule.max && left >= 0){ chip = '<span class="chip ok">Можно ещё '+(rule.max-n)+'</span>'; verdict = 'Можно ещё <b>'+(rule.max-n)+'</b> до <b>'+D_(dl)+'</b> включительно (осталось '+left+' дн.).'; }
+    if(viol){ chip = '<span class="chip rd">Нарушение</span>'; const reasons = g.ops.filter(o=>o.bad && o.why && o.why.length).map(o=>'<div style="margin-top:4px">• Операция '+esc(o.nr||"")+' ('+esc(dfmt(o.d))+'): '+esc(o.why.join("; "))+'.</div>').join("");
+      verdict = '<b>Нарушение правил каботажа.</b>'+reasons+'<div style="margin-top:6px;color:var(--dim);font-size:12.5px">Операций использовано: '+n+' из '+rule.max+'. Покажи координатору лист.</div>'; }
+    else if(n < rule.max && left >= 0){ chip = '<span class="chip ok">Можно ещё '+(rule.max-n)+'</span>'; verdict = 'Можно ещё <b>'+(rule.max-n)+'</b>. Последняя выгрузка — не позже <b>'+D_(dl)+'</b> (осталось '+left+' дн.).'; }
     else if(pauseTo!=null && r.today <= pauseTo){ chip = '<span class="chip am">Пауза до '+dfmt(pauseTo)+'</span>'; verdict = (n>=rule.max?'Лимит использован.':'Окно закрыто.')+' Каботаж в этой стране нельзя до <b>'+D_(pauseTo)+'</b>, со следующего дня можно.'; }
     else { chip = '<span class="chip gr">Окно закрыто</span>'; verdict = (n>=rule.max?'Лимит использован.':'Окно закрыто.')+' Новый каботаж — после следующей международной доставки'+(pauseTo!=null?' (после '+D_(pauseTo)+')':'')+'.'; }
     const total = Math.max(n, rule.max);
@@ -2252,7 +2272,7 @@ function renderCabPane(r){
     let strip = '';
     for(let k=0;k<=rule.days;k++){
       const day = g.start + k, op = g.ops.find(o=>o.d===day);
-      strip += '<div class="sd'+(k===0?' dlv':'')+(op?(op.bad?' opbad':' op'):'')+(day===r.today?' today':'')+'"><b>'+(k===0?'дост.':(op?'каб.':''))+'</b>'+esc(dfmt(day))+'</div>';
+      strip += '<div class="sd'+(k===0&&!op?' dlv':'')+(op?(op.bad?' opbad':' op'):'')+(day===r.today?' today':'')+'"><b>'+(k===0?(op?'дост.+каб.':'дост.'):(op?'каб.':''))+'</b>'+esc(dfmt(day))+'</div>';
     }
     html += '<div class="cabg"><div class="gh"><span class="gn">'+fl+' '+esc(nm)+'</span>'+chip+'</div>' +
       '<div class="dots">'+dots+'<small>'+n+' из '+rule.max+'</small></div>' +
