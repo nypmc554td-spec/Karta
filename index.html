@@ -212,8 +212,12 @@ body[data-tab="cab"] #cabWarn{display:none!important}
 .instr h4{color:var(--amber);font-size:12px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}
 .sigpad{width:100%;height:140px;background:#fff;border:1px solid var(--line);border-radius:12px;touch-action:none;display:block;cursor:crosshair}
 .sigwrap{margin:6px 0 12px}
-.sigrow{display:flex;align-items:center;gap:8px;margin-top:6px}
+.sigrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}
 .sigrow .mini{min-height:38px}
+.sigpick{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.sigpick .sp{background:#fff;border:1.5px solid var(--line,#ccd);border-radius:10px;padding:4px;width:calc(50% - 4px);display:flex;flex-direction:column;align-items:center}
+.sigpick .sp img{width:100%;height:56px;object-fit:contain}
+.sigpick .sp small{font-size:11px;color:var(--dim);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mini.on{background:#25664011;border-color:#8CC5A2;color:#1F6B41;font-weight:700}
 .add.sm{padding:8px;font-size:13px;margin-top:2px}
 .sub .del{margin-left:auto;position:relative;top:-1px}
@@ -377,7 +381,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v75</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v76</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPrintNative" title="Обычная печать Safari">Печать</button>
@@ -558,6 +562,21 @@ function prevSig(which){
   return "";
 }
 
+let SIGPICK = "";
+/* все разные подписи, что есть на картах: для выбора в любую ячейку */
+function sigChoices(){
+  const out = [], seen = {};
+  const list = ((DB && DB.cards) || []).slice().reverse();
+  list.forEach(c=>{ if(!c || !c.sig) return;
+    [["k1",1],["k2",2]].forEach(a=>{ const v = c.sig[a[0]]; if(!v || seen[v]) return; seen[v] = 1;
+      out.push({v:v, card:c.name||"", slot:a[1]}); }); });
+  return out;
+}
+function sigGallery(path){
+  const ch = sigChoices();
+  if(!ch.length) return '<div class="hint">'+LX("Сохранённых подписей пока нет","Збережених підписів поки немає","Brak zapisanych podpisów")+'</div>';
+  return '<div class="sigpick">'+ch.map((x,i)=>'<button class="sp" data-sigset="'+path+'|'+i+'"><img src="'+x.v+'" alt=""><small>'+esc(x.card)+' · '+x.slot+'</small></button>').join("")+'</div>';
+}
 function rememberSig(){
   try{ if(C && C.sig) DB.lastSig = {k1: C.sig.k1 || "", k2: C.sig.k2 || ""}; }catch(e){}
 }
@@ -612,6 +631,9 @@ const IPAT = { ua: [[new RegExp("^Последняя копия — (\\d+) дн\
 I18N.ua["Карта создана, подпись перенесена"] = "Карту створено, підпис перенесено";
 I18N.pl["Карта создана, подпись перенесена"] = "Karta utworzona, podpis przeniesiony";
 I18N.ua["Каботаж"] = "Каботаж"; I18N.pl["Каботаж"] = "Kabotaż";
+I18N.ua["Выбрать…"]="Обрати…"; I18N.pl["Выбрать…"]="Wybierz…";
+I18N.ua["⇄ Поменять подписи местами"]="⇄ Поміняти підписи місцями"; I18N.pl["⇄ Поменять подписи местами"]="⇄ Zamień podpisy miejscami";
+I18N.ua["Подписи поменяны местами"]="Підписи поміняно місцями"; I18N.pl["Подписи поменяны местами"]="Podpisy zamienione miejscami";
 I18N.ua["С прошлой карты"] = "З минулої карти";
 I18N.pl["С прошлой карты"] = "Z poprzedniej karty";
 I18N.ua["Подпись перенесена"] = "Підпис перенесено";
@@ -948,15 +970,20 @@ function renderMain(){
       <canvas class="sigpad" data-sig="sig.k1"></canvas>
       <div class="sigrow"><button class="mini" data-sigclear="sig.k1">Очистить</button>
         <button class="mini" data-sigcopy="sig.k1">С прошлой карты</button>
+        <button class="mini" data-sigpick="sig.k1">Выбрать…</button>
         <span class="hint" style="margin:0">${C.sig.k1?"подпись сохранена":"пусто"}</span></div>
+      ${SIGPICK==="sig.k1"?sigGallery("sig.k1"):""}
     </div>
     <div class="sigwrap">
       <label class="f"><span>Drugi kierowca — расписаться пальцем</span></label>
       <canvas class="sigpad" data-sig="sig.k2"></canvas>
       <div class="sigrow"><button class="mini" data-sigclear="sig.k2">Очистить</button>
         <button class="mini" data-sigcopy="sig.k2">С прошлой карты</button>
+        <button class="mini" data-sigpick="sig.k2">Выбрать…</button>
         <span class="hint" style="margin:0">${C.sig.k2?"подпись сохранена":"пусто"}</span></div>
+      ${SIGPICK==="sig.k2"?sigGallery("sig.k2"):""}
     </div>
+    <div class="sigrow" style="margin:0 0 8px"><button class="mini" data-sigswap="1">⇄ Поменять подписи местами</button></div>
     <p class="hint">Подпись встанет на бланке над линией «Pierwszy kierowca» / «Drugi kierowca». Если оставить пусто — напечатается чистая линия, как в оригинале.</p>
   </div>`;
   initSigs();
@@ -2474,6 +2501,14 @@ document.addEventListener("click", async e=>{
 
   if(t.dataset.sigclear){
     setP(C, t.dataset.sigclear, ""); rememberSig(); save(); renderMain(); toast("Подпись очищена"); return;
+  }
+  if(t.dataset.sigpick){ SIGPICK = (SIGPICK === t.dataset.sigpick ? "" : t.dataset.sigpick); renderMain(); return; }
+  if(t.dataset.sigset){
+    const a = t.dataset.sigset.split("|"), x = sigChoices()[+a[1]]; if(!x) return;
+    setP(C, a[0], x.v); SIGPICK = ""; rememberSig(); save(true); renderMain(); toast("Подпись перенесена"); return;
+  }
+  if(t.dataset.sigswap){
+    const k = C.sig.k1; C.sig.k1 = C.sig.k2; C.sig.k2 = k; SIGPICK = ""; rememberSig(); save(true); renderMain(); toast("Подписи поменяны местами"); return;
   }
   if(t.dataset.sigcopy){
     const which = t.dataset.sigcopy.split(".")[1];
