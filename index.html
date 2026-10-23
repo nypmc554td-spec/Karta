@@ -85,6 +85,49 @@ textarea{min-height:90px;line-height:1.35}
   border-radius:9px;padding:0 10px;font-size:12px;font-weight:700;cursor:pointer;min-height:44px;
 }
 .mini:active{background:var(--panel2)}
+.cabtab{width:100%;border-collapse:collapse;margin-top:6px;font-size:8.5pt}
+.cabtab th,.cabtab td{border:1px solid #9aa0a8;padding:3px 4px;text-align:left;vertical-align:top}
+.cabtab th{background:#F1EEE6;font-weight:700;font-size:8pt}
+.cabtab td.c{text-align:center}
+.cabg{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0}
+.cabg .gh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cabg .gn{font-size:17px;font-weight:700}
+.cabg .chip{margin-left:auto;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px}
+.chip.ok{background:#E4F2E8;color:#1F6B41}
+.chip.am{background:#FDF3DC;color:#7A5410}
+.chip.rd{background:#D9342B;color:#fff}
+.chip.gr{background:#ECEDEF;color:#5A6069}
+.cabg .dots{display:flex;gap:8px;margin:12px 0 4px;align-items:center}
+.cabg .dot{width:26px;height:26px;border-radius:50%;border:2px solid #B9BEC6;box-sizing:border-box}
+.cabg .dot.on{background:#2F7D4F;border-color:#2F7D4F}
+.cabg .dot.bad{background:#D9342B;border-color:#D9342B}
+.cabg .dots small{color:var(--dim);font-size:12px;margin-left:4px}
+.cabg .strip{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;margin:10px 0 4px}
+.cabg .sd{border:1px solid #D3D6DB;border-radius:7px;padding:4px 0;text-align:center;font-size:10px;line-height:1.2;color:#5A6069;background:#FAFAFA}
+.cabg .sd b{display:block;font-size:9px;font-weight:700;color:#8A5A00;min-height:11px}
+.cabg .sd.dlv{background:#E6F0FB;border-color:#9DBBE0;color:#1D3F66}
+.cabg .sd.dlv b{color:#1D3F66}
+.cabg .sd.op{background:#2F7D4F;border-color:#2F7D4F;color:#fff}
+.cabg .sd.op b{color:#fff}
+.cabg .sd.opbad{background:#D9342B;border-color:#D9342B;color:#fff}
+.cabg .sd.opbad b{color:#fff}
+.cabg .sd.today{outline:2px solid #15181c;outline-offset:1px}
+.cabg .verdict{font-size:14px;line-height:1.45;margin:8px 0 2px}
+.cabg .ops{margin-top:8px;border-top:1px solid #E4E6EA}
+.cabg .ops div{font-size:12.5px;padding:5px 0;border-bottom:1px solid #F0F1F3;display:flex;gap:8px}
+.cabg .ops i{font-style:normal;color:var(--dim);flex:0 0 auto}
+.cabintro{color:var(--dim);font-size:12.5px;line-height:1.5;margin:8px 2px}
+body[data-tab="cab"] #cabWarn{display:none!important}
+.cabwarn{margin:8px 12px 0}
+.cabwarn .cab{padding:9px 12px;border-radius:10px;font-size:13px;line-height:1.4;margin-top:6px}
+.cabwarn .cab:first-child{margin-top:0}
+.cabwarn .cab-r{background:#FDE3E0;border:1px solid #D9342B;color:#7A1710;font-weight:700}
+.cabwarn .cab-a{background:#FDF3DC;border:1px solid #E0BE72;color:#5A4413;font-weight:600}
+.cabwarn .cab-i{background:#E6F0FB;border:1px solid #9DBBE0;color:#1D3F66}
+.cabwarn .cab-n{color:var(--dim);font-size:11px;margin:5px 2px 0}
+.rcab{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:#E6F0FB;color:#1D3F66}
+.rcab.bad{background:#D9342B;color:#fff}
+.rcab:empty{display:none}
 /* ---------- Вкладка «Карта» — как печатный бланк ---------- */
 .frm{border:1.5px solid #2a2f36;border-radius:8px;background:#fff;margin:10px 0;overflow:hidden}
 .frm .r{display:grid;border-top:1px solid #8d939c}
@@ -220,7 +263,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),li
 .rus ul{margin:2mm 0 0;padding-left:6mm}
 .rus li{margin-bottom:2.4mm;text-align:justify}
 @media print{
-  header,nav,main,.bkwarn,.toast{display:none!important}
+  header,nav,main,.bkwarn,.cabwarn,.toast{display:none!important}
   body{background:#fff}
   #print{position:static!important;left:auto!important;top:auto!important;padding:0!important;zoom:1!important}
   .page{margin:0;page-break-after:always;break-after:page;page-break-inside:avoid;break-inside:avoid}
@@ -334,7 +377,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v64</span><small id="saveState">—</small></div>
+  <div class="brand"><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v68</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <button class="btn" id="btnPrintNative" title="Обычная печать Safari">Печать</button>
@@ -354,6 +397,7 @@ svg.bchart{height:15px}
 </header>
 
 <div id="bkWarn" class="bkwarn" style="display:none"></div>
+<div id="cabWarn" class="cabwarn" style="display:none"></div>
 <nav id="tabs"></nav>
 <main>
   <section class="pane" id="pane-main"></section>
@@ -361,6 +405,7 @@ svg.bchart{height:15px}
   <section class="pane" id="pane-tank"></section>
   <section class="pane" id="pane-koszty"></section>
   <section class="pane" id="pane-itogi"></section>
+  <section class="pane" id="pane-cab"></section>
   <section class="pane" id="pane-info"></section>
 </main>
 
@@ -663,6 +708,7 @@ function renderList(list){
 let saveT;
 function save(now){
   $("#saveState").textContent = T("сохраняю…");
+  renderCab();
   clearTimeout(saveT);
   const go = async ()=>{
     saveT = null;
@@ -815,10 +861,11 @@ function cardF(path,label,kind){
 }
 
 /* ================= Экраны ================= */
-const TABS = [["main","Карта"],["trasa","Trasa"],["tank","Заправки"],["koszty","Расходы"],["itogi","Итоги"],["info","Инструкция"]];
+const TABS = [["main","Карта"],["trasa","Trasa"],["cab","Каботаж"],["tank","Заправки"],["koszty","Расходы"],["itogi","Итоги"],["info","Инструкция"]];
 let activeTab = "main";
 
 function renderTabs(){
+  try{ document.body.dataset.tab = activeTab; }catch(e){}
   $("#tabs").innerHTML = TABS.map(([k,t])=>`<button class="tab ${k===activeTab?"on":""}" data-tab="${k}">${t}</button>`).join("");
   document.querySelectorAll(".pane").forEach(p=>p.classList.toggle("on", p.id==="pane-"+activeTab));
 }
@@ -1032,7 +1079,7 @@ function paintRow(el){
   const sm = el.querySelector(".rsum");
   if(sm && folded){ sm.innerHTML = rowSummary(list, r); translateTree(sm); }
 }
-function paintRows(){ document.querySelectorAll(".item[data-row]").forEach(paintRow); paintEmpty(); paintValid(); }
+function paintRows(){ document.querySelectorAll(".item[data-row]").forEach(paintRow); paintEmpty(); paintValid(); renderCab(); }
 function paintValid(){
   document.querySelectorAll("main input[data-p], main select[data-p], main textarea[data-p]").forEach(validateEl);
   checkKmSequence();
@@ -1042,7 +1089,7 @@ function paintValid(){
 function renderTrasa(){
   const rows = C.trasa.map((r,i)=>`
   <div class="item" data-row="trasa|${i}">
-    <div class="ihead"><b>Строка ${i+1}</b><span class="rst"></span><span class="rkm"></span><button class="fbtn" data-fold="trasa|${i}">Готово</button><button class="del" data-del="trasa|${i}">Удалить</button></div><div class="rsum"></div>
+    <div class="ihead"><b>Строка ${i+1}</b><span class="rst"></span><span class="rkm"></span><span class="rcab"></span><button class="fbtn" data-fold="trasa|${i}">Готово</button><button class="del" data-del="trasa|${i}">Удалить</button></div><div class="rsum"></div>
     <div class="grid">
       ${inp("trasa."+i+".nr","Nr zlecenia")}
       ${wagaF("trasa."+i+".waga","Waga ładunku","т / кг | PCA")}
@@ -2002,6 +2049,236 @@ function daysSinceBackup(){
 function hasData(){
   return DB.cards.some(c => c.trasa.length || c.tankON.length || c.head.nrWyjazdu || c.baza.wyjD);
 }
+/* ================= Каботаж: подсказка по записям в Trasa =================
+   ЕС и Норвегия: до 3 операций за 7 дней после международной доставки, потом пауза 4 дня.
+   Великобритания: до 2 за 7 дней. Швейцария: каботаж запрещён. Остальное — «правила другие». */
+const CAB_ALIAS = {D:"DE",F:"FR",B:"BE",I:"IT",A:"AT",E:"ES",S:"SE",N:"NO",H:"HU",L:"LU",P:"PT",UK:"GB"};
+const EU_SET = new Set("AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE".split(" "));
+function cabC(v){ const s = String(v||"").trim().toUpperCase().replace(/[^A-Z]/g,""); return CAB_ALIAS[s] || s; }
+function cabRule(c){
+  if(c==="CH") return {ban:true};
+  if(c==="GB") return {max:2, days:7, cool:0};
+  if(c==="NO" || EU_SET.has(c)) return {max:3, days:7, cool:4};
+  return {unknown:true};
+}
+function dnum(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso||""); return m ? Math.round(Date.UTC(+m[1],+m[2]-1,+m[3])/86400000) : null; }
+function dfmt(n){ const d = new Date(n*86400000); return String(d.getUTCDate()).padStart(2,"0")+"."+String(d.getUTCMonth()+1).padStart(2,"0"); }
+
+function cabotage(){
+  const ev = [];
+  (DB.cards||[]).forEach(card=>{
+    (card.trasa||[]).forEach((r,i)=>{
+      const Z = zList(r).filter(x=>cabC(x.zk)), W = wList(r).filter(x=>cabC(x.wk));
+      if(!Z.length || !W.length) return;
+      const Lc = new Set(Z.map(x=>cabC(x.zk))), Uc = new Set(W.map(x=>cabC(x.wk)));
+      const all = new Set([...Lc, ...Uc]);
+      const cur = card === C;
+      if(all.size === 1){
+        const c = [...all][0]; if(c === "PL") return;
+        const zd = dnum(Z[0].zd), wd = dnum(W[W.length-1].wd), d = zd!=null ? zd : wd;
+        if(d == null) return;
+        const z0 = Z[0], w9 = W[W.length-1];
+        ev.push({t:"dom", c:c, d:d, e:(wd!=null?wd:d), i:i, cur:cur, tie:1,
+          nr:r.nr||"", zm:z0.zm||"", wm:w9.wm||"", zd:z0.zd||"", wd:w9.wd||""});
+      }else{
+        W.forEach(w=>{
+          const c = cabC(w.wk);
+          if([...Lc].some(x=>x!==c)){
+            const d = dnum(w.wd)!=null ? dnum(w.wd) : dnum(Z[0].zd);
+            if(d != null) ev.push({t:"int", c:c, d:d, i:i, cur:cur, tie:0,
+              nr:r.nr||"", from:[...Lc].find(x=>x!==c)||"", city:w.wm||""});
+          }
+        });
+      }
+    });
+  });
+  ev.sort((a,b)=> a.d-b.d || a.tie-b.tie);
+
+  const st = {}, rows = {}, issues = [];
+  const add = (cur, lvl, txt)=>{ if(cur && issues.every(x=>x.txt!==txt)) issues.push({lvl:lvl, txt:txt}); };
+  ev.forEach(e=>{
+    const s = st[e.c] || (st[e.c] = {g:null, closed:[]});
+    if(e.t === "int"){ if(s.g && s.g.ops.length) s.closed.push(s.g); s.g = {start:e.d, ops:[], cur:e.cur, nr:e.nr, from:e.from, city:e.city}; return; }
+    const rule = cabRule(e.c), nm = krajName(e.c);
+    let label = "", bad = false;
+    if(rule.ban){ add(e.cur,"r", nm+": каботаж запрещён"); label = "⚠ запрещён"; bad = true;
+      (s.ban || (s.ban = [])).push({d:e.d, e:e.e, cur:e.cur, bad:true, nr:e.nr, zm:e.zm, wm:e.wm, zd:e.zd, wd:e.wd}); }
+    else if(rule.unknown){ return; }   // страны вне ЕС/UK/CH не считаем
+    else{
+      const g = s.g;
+      if(!g){ add(e.cur,"a", nm+": не вижу международной доставки в эту страну перед внутренней перевозкой"); label = "нет доставки?"; }
+      else{
+        const n = g.ops.length + 1;
+        if(e.d > g.start + rule.days){ add(e.cur,"r", nm+": прошло больше "+rule.days+" дн. после международной доставки"); bad = true; }
+        if(n > rule.max){ add(e.cur,"r", nm+": "+n+"-я операция, лимит "+rule.max); bad = true; }
+        const pg = s.closed.length ? s.closed[s.closed.length-1] : null;
+        if(rule.cool && pg){
+          const last = pg.ops[pg.ops.length-1].e;
+          if(e.d - last <= rule.cool){ add(e.cur,"r", nm+": пауза "+rule.cool+" дн. после прошлого каботажа (до "+dfmt(last+rule.cool)+")"); bad = true; }
+        }
+        g.ops.push({d:e.d, e:e.e, cur:e.cur, bad:bad, nr:e.nr, zm:e.zm, wm:e.wm, zd:e.zd, wd:e.wd});
+        label = (bad?"⚠ ":"")+"каботаж "+n+"/"+rule.max;
+      }
+    }
+    if(e.cur) rows[e.i] = {text:label, bad:bad};
+  });
+
+  /* что сейчас, на сегодня */
+  const today = dnum(todayISO()), info = [];
+  let newest = null;
+  Object.keys(st).forEach(c=>{
+    const s = st[c], g = s.g, rule = cabRule(c);
+    if(!g || rule.ban || rule.unknown) return;
+    const nm = krajName(c), left = g.start + rule.days - today;
+    if(g.ops.length){
+      const opsLeft = rule.max - g.ops.length, lastEnd = g.ops[g.ops.length-1].e, pauseTo = lastEnd + rule.cool;
+      if(opsLeft > 0 && left >= 0) info.push({lvl:"a", txt:nm+": каботаж "+g.ops.length+"/"+rule.max+" · осталось "+opsLeft+" оп., "+left+" дн. (до "+dfmt(g.start+rule.days)+")"});
+      else if(rule.cool && today <= pauseTo) info.push({lvl:"a", txt:nm+": пауза каботажа до "+dfmt(pauseTo)+" — со следующего дня можно снова"});
+    }else if(left >= 0 && (!newest || g.start > newest.g.start)){
+      newest = {c:c, g:g, nm:nm, rule:rule};
+    }
+  });
+  if(newest) info.push({lvl:"i", txt:newest.nm+": можно до "+newest.rule.max+" каботажей до "+dfmt(newest.g.start+newest.rule.days)+" (после международной доставки)"});
+  const groups = [];
+  Object.keys(st).forEach(c=>{ const s = st[c]; s.closed.concat(s.g ? [s.g] : []).forEach(g=>groups.push({c:c, g:g, rule:cabRule(c)})); if(s.ban) groups.push({c:c, ban:s.ban, rule:cabRule(c)}); });
+  return {rows:rows, issues:issues, info:info, groups:groups, today:today};
+}
+
+/* ---------- Лист для координатора: каботаж, факты по датам (по-польски, как лист для офиса) ---------- */
+function isoOf(n){ const d = new Date(n*86400000); return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0"); }
+function printCab(){
+  LG = "pl";
+  const r = cabotage(), h = C.head;
+  const kier = [h.k1i, h.k1n].filter(Boolean).join(" ");
+  const D_ = n => fmtD(isoOf(n));
+  const showG = r.groups.filter(x=>{
+    if(x.ban) return x.ban.some(o=>o.cur);
+    const g = x.g;
+    if(g.ops.some(o=>o.cur)) return true;
+    return g.cur && x.rule.days != null && (g.start + x.rule.days - r.today) >= 0;   // открытое окно без операций
+  }).sort((a,b)=> (a.ban ? a.ban[0].d : a.g.start) - (b.ban ? b.ban[0].d : b.g.start));
+  const opRows = ops => ops.map((o,k)=>'<tr><td class="c">'+(k+1)+'</td><td>'+esc(o.nr||"—")+'</td><td>'+esc(fmtD(o.zd)||D_(o.d))+'</td><td>'+esc(o.zm||"—")+'</td><td>'+esc(o.wm||"—")+'</td><td>'+esc(fmtD(o.wd)||D_(o.e))+'</td><td class="c">'+(o.bad?"<b>!</b>":"")+'</td></tr>').join("");
+  const opTab = ops => '<table class="cabtab"><tr><th style="width:6%">Lp</th><th style="width:16%">Nr zlecenia</th><th style="width:15%">Data załadunku</th><th>Załadunek</th><th>Wyładunek</th><th style="width:15%">Data wyładunku</th><th style="width:5%"></th></tr>'+opRows(ops)+'</table>';
+  const box = (cls, html) => '<div class="itoflag '+cls+'">'+html+'</div>';
+  let body = "";
+  if(!showG.length){
+    body = box("ok","<b>Brak kabotażu</b> w tej karcie — nie wykryto przewozów krajowych poza Polską.");
+  }
+  showG.forEach(x=>{
+    const nm = krajName(x.c);
+    if(x.ban){
+      body += '<div class="itoh">'+esc(nm)+'</div>' + box("bad","<b>Kabotaż w kraju "+esc(nm)+" jest zabroniony.</b> Poniższe przewozy krajowe wymagają wyjaśnienia.") + opTab(x.ban);
+      return;
+    }
+    const g = x.g, rule = x.rule, n = g.ops.length, dl = g.start + rule.days;
+    const lastEnd = n ? g.ops[n-1].e : null;
+    const viol = g.ops.some(o=>o.bad) || n > rule.max;
+    const open = (dl - r.today) >= 0 && n < rule.max && !viol;
+    let verdict;
+    if(viol) verdict = box("bad","<b>Uwaga — naruszenie zasad kabotażu</b> (zaznaczone „!” w tabeli). Wykorzystano "+n+" z "+rule.max+" operacji.");
+    else if(open) verdict = box("warn","<b>Wykorzystano "+n+" z "+rule.max+" operacji.</b> Można jeszcze "+(rule.max-n)+" do <b>"+D_(dl)+"</b> włącznie.");
+    else verdict = box("ok","<b>Wykorzystano "+n+" z "+rule.max+" operacji.</b> "+(n >= rule.max ? "Limit wykorzystany." : "Okno kabotażu zamknięte ("+D_(dl)+").")+
+      (rule.cool && lastEnd != null ? " Kolejny kabotaż w kraju "+esc(nm)+" możliwy od <b>"+D_(lastEnd + rule.cool + 1)+"</b>." : " Kolejny kabotaż możliwy po nowej dostawie międzynarodowej."));
+    body += '<div class="itoh">'+esc(nm)+'</div>' +
+      '<table class="nb itotab">' +
+        '<tr><td style="border:none;padding:2px 0">Dostawa międzynarodowa</td><td style="border:none;padding:2px 0;text-align:right">'+esc(D_(g.start))+(g.from?" · "+esc(krajName(g.from))+" → "+esc(nm)+(g.city?" ("+esc(g.city)+")":""):"")+(g.nr?" · zlec. "+esc(g.nr):"")+'</td></tr>' +
+        '<tr><td style="border:none;padding:2px 0">Okno kabotażu ('+rule.days+' dni)</td><td style="border:none;padding:2px 0;text-align:right">'+esc(D_(g.start))+' – '+esc(D_(dl))+'</td></tr>' +
+        '<tr><td style="border:none;padding:2px 0">Limit operacji</td><td style="border:none;padding:2px 0;text-align:right">'+rule.max+(rule.cool?' · przerwa '+rule.cool+' dni':'')+'</td></tr>' +
+      '</table>' + (n ? opTab(g.ops) : '') + verdict;
+  });
+  const html = '<div class="sheet ito">' +
+    '<div class="itohead"><div><div class="itotitle">Kabotaż — zestawienie</div>' +
+      '<div class="itosub">' + esc(C.name || "") + ' · stan na ' + esc(fmtD(todayISO())) + '</div></div>' +
+      '<div class="itosub" style="text-align:right">' + esc(h.nrRej || "") + '<br>' + esc(kier) + '</div></div>' +
+    body +
+    '<div class="itofoot">UE i Norwegia (rozp. (UE) 2020/1055): po dostawie międzynarodowej do 3 operacji kabotażowych w ciągu 7 dni, następnie 4 dni przerwy w tym samym kraju. ' +
+      'Wielka Brytania: do 2 operacji w ciągu 7 dni. Szwajcaria: kabotaż zabroniony. Zestawienie sporządzone na podstawie wpisów kierowcy w karcie drogowej; dokumenty potwierdzające: CMR i zlecenia.</div>' +
+    sigBlock() + '</div>';
+  LG = null;
+  return html;
+}
+function buildCabPrint(){
+  try{
+    $("#print").innerHTML = '<div class="page">' + printCab() + '</div>';
+    fitPages(); fitCells();
+    return true;
+  }catch(err){ LG = null; toast("Не удалось собрать лист"); return false; }
+}
+
+function flagOf(c){ try{ return c && c.length===2 ? String.fromCodePoint.apply(null, [...c].map(ch=>0x1F1E6 + ch.charCodeAt(0) - 65)) : ""; }catch(e){ return ""; } }
+function renderCabPane(r){
+  const el = $("#pane-cab"); if(!el) return;
+  const D_ = n => fmtD(isoOf(n));
+  const groups = r.groups.filter(x=>{
+    if(x.ban) return x.ban.some(o=>o.cur);
+    return x.g.ops.some(o=>o.cur) || (x.g.cur && (x.g.start + x.rule.days - r.today) >= 0);
+  }).sort((a,b)=> (b.ban ? b.ban[0].d : b.g.start) - (a.ban ? a.ban[0].d : a.g.start));
+  const intro = '<p class="cabintro"><b>Каботаж</b> — перевозка внутри чужой страны (не Польши) после международной доставки в неё. ' +
+    'ЕС и Норвегия: до 3 операций за 7 дней, потом пауза 4 дня. Англия: до 2 за 7 дней. Швейцария: запрещён. ' +
+    'Считается сам по странам и датам из Trasa.</p>';
+  if(!groups.length){
+    el.innerHTML = '<div class="card"><h3>Каботаж</h3><p class="hint" style="font-size:14px">Пока каботажа нет. Заполни в Trasa страны и даты загрузки и выгрузки — здесь всё посчитается само.</p></div>' + intro;
+    return;
+  }
+  let html = '<button class="btn primary" id="btnCabPrint" style="width:100%;margin:10px 0 0">Лист для координатора</button>';
+  groups.forEach(x=>{
+    const nm = krajName(x.c), fl = flagOf(x.c);
+    if(x.ban){
+      html += '<div class="cabg"><div class="gh"><span class="gn">'+fl+' '+esc(nm)+'</span><span class="chip rd">Запрещено</span></div>' +
+        '<div class="verdict">В этой стране каботаж запрещён. Внутренние перевозки ниже — нарушение.</div>' +
+        '<div class="ops">'+x.ban.map(o=>'<div><i>'+esc(dfmt(o.d))+'</i><span>'+esc(o.nr||"—")+' · '+esc(o.zm||"?")+' → '+esc(o.wm||"?")+'</span></div>').join("")+'</div></div>';
+      return;
+    }
+    const g = x.g, rule = x.rule, n = g.ops.length, dl = g.start + rule.days, left = dl - r.today;
+    const lastEnd = n ? g.ops[n-1].e : null;
+    const viol = n > rule.max || g.ops.some(o=>o.bad);
+    const pauseTo = (rule.cool && lastEnd!=null) ? lastEnd + rule.cool : null;
+    let chip, verdict;
+    if(viol){ chip = '<span class="chip rd">Нарушение</span>'; verdict = 'Превышены правила каботажа: операций '+n+' из '+rule.max+' (красные отметки). Покажи координатору лист.'; }
+    else if(n < rule.max && left >= 0){ chip = '<span class="chip ok">Можно ещё '+(rule.max-n)+'</span>'; verdict = 'Можно ещё <b>'+(rule.max-n)+'</b> до <b>'+D_(dl)+'</b> включительно (осталось '+left+' дн.).'; }
+    else if(pauseTo!=null && r.today <= pauseTo){ chip = '<span class="chip am">Пауза до '+dfmt(pauseTo)+'</span>'; verdict = (n>=rule.max?'Лимит использован.':'Окно закрыто.')+' Каботаж в этой стране нельзя до <b>'+D_(pauseTo)+'</b>, со следующего дня можно.'; }
+    else { chip = '<span class="chip gr">Окно закрыто</span>'; verdict = (n>=rule.max?'Лимит использован.':'Окно закрыто.')+' Новый каботаж — после следующей международной доставки'+(pauseTo!=null?' (после '+D_(pauseTo)+')':'')+'.'; }
+    const total = Math.max(n, rule.max);
+    let dots = '';
+    for(let k=0;k<total;k++){ const o = g.ops[k]; dots += '<span class="dot'+(o?(o.bad||k>=rule.max?' bad':' on'):'')+'"></span>'; }
+    let strip = '';
+    for(let k=0;k<=rule.days;k++){
+      const day = g.start + k, op = g.ops.find(o=>o.d===day);
+      strip += '<div class="sd'+(k===0?' dlv':'')+(op?(op.bad?' opbad':' op'):'')+(day===r.today?' today':'')+'"><b>'+(k===0?'дост.':(op?'каб.':''))+'</b>'+esc(dfmt(day))+'</div>';
+    }
+    html += '<div class="cabg"><div class="gh"><span class="gn">'+fl+' '+esc(nm)+'</span>'+chip+'</div>' +
+      '<div class="dots">'+dots+'<small>'+n+' из '+rule.max+'</small></div>' +
+      '<div class="strip">'+strip+'</div>' +
+      '<div class="verdict">'+verdict+'</div>' +
+      (n ? '<div class="ops">'+g.ops.map((o,k)=>'<div><i>'+(k+1)+'. '+esc(dfmt(o.d))+'</i><span>'+esc(o.nr||"—")+' · '+esc(o.zm||"?")+' → '+esc(o.wm||"?")+'</span></div>').join("")+'</div>' : '') +
+      '</div>';
+  });
+  el.innerHTML = html + intro;
+}
+
+function renderCab(){
+  try{
+    if(!C || !DB.cards) return;
+    const el = $("#cabWarn"); if(!el) return;
+    const r = cabotage();
+    renderCabPane(r);
+    const lines = r.issues.map(x=>({lvl:x.lvl, txt:x.txt})).concat(r.info);
+    const cls = {r:"cab-r", a:"cab-a", i:"cab-i"};
+    if(!lines.length){ el.style.display = "none"; el.innerHTML = ""; }
+    else{
+      el.style.display = "block";
+      el.innerHTML = lines.map(x=>'<div class="cab '+cls[x.lvl]+'">'+(x.lvl==="r"?"⚠ ":"")+esc(x.txt)+'</div>').join("") +
+        '<div class="row2" style="margin-top:8px"><button class="btn" data-tab="cab">Подробнее</button><button class="btn" id="btnCabPrint">Лист для координатора</button></div>' +
+        '<div class="cab-n">Подсказка по записям в Trasa. Окончательно проверяй по CMR.</div>';
+    }
+    document.querySelectorAll('.item[data-row^="trasa|"]').forEach(row=>{
+      const i = +row.dataset.row.split("|")[1], b = row.querySelector(".rcab"); if(!b) return;
+      const x = r.rows[i];
+      b.textContent = x ? x.text : ""; b.classList.toggle("bad", !!(x && x.bad));
+    });
+  }catch(e){}
+}
+
 function renderWarn(){
   const el = $("#bkWarn");
   if(!el) return;
@@ -2251,6 +2528,9 @@ document.addEventListener("click", async e=>{
        «Поделиться» (там есть Печать и Сохранить в Файлы). */
     case "btnPrint": PRINT_MODE = "card"; buildPrint(); exportPdf(); break;
     case "btnPrintNative": PRINT_MODE = "card"; buildPrint(); safePrint(); break;
+    case "btnCabPrint": PRINT_MODE = "itogi";
+      if(buildCabPrint()) exportPdf("Kabotaz"); else PRINT_MODE = "card";
+      break;
     case "btnItogiPrint": PRINT_MODE = "itogi";
       if(buildItogiPrint()) exportPdf(); else PRINT_MODE = "card";
       break;
@@ -2414,7 +2694,7 @@ function showPdfSheet(blob, name){
 }
 
 let PDF_BUSY = false;
-async function exportPdf(){
+async function exportPdf(prefix){
   if(PDF_BUSY) return;
   PDF_BUSY = true;
   toast("Готовлю PDF…");
@@ -2423,7 +2703,7 @@ async function exportPdf(){
     const pages = Array.from(document.querySelectorAll("#print .page"));
     const imgs = [];
     for(const pg of pages) imgs.push(await pageToJpeg(pg, 3));
-    const nm = "Karta_" + ((C && C.name) || "drogowa").replace(/[^\wА-Яа-яЁё.-]+/g,"_") + ".pdf";
+    const nm = (prefix || "Karta") + "_" + ((C && C.name) || "drogowa").replace(/[^\wА-Яа-яЁё.-]+/g,"_") + ".pdf";
     showPdfSheet(makePdf(imgs), nm);
   }catch(e){
     toast("PDF не собрался — жми «Печать»");
