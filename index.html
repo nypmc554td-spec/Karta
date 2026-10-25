@@ -245,6 +245,15 @@ img.colo{position:absolute;right:4px;top:3px;height:24px;width:91px}
 .trasa .pfl{height:2.2mm;width:3.3mm;margin-right:.5mm}
 .pfl{display:inline-block;height:3mm;width:4.5mm;vertical-align:middle;margin-right:.8mm}
 .val.cardtxt{font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;font-weight:600;font-size:8.5pt;letter-spacing:.1px}
+#clsOv{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center}
+#clsOv .bx{background:#fff;width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px}
+#clsOv h3{margin:0 0 10px;font-size:17px}
+#clsOv label{display:block;font-size:12px;color:var(--dim);margin:10px 0 3px}
+#clsOv input,#clsOv select{width:100%;padding:10px;font-size:16px;border:1.5px solid var(--line);border-radius:10px;background:#fff}
+#clsOv .st{margin-top:10px;padding:10px;border-radius:10px;font-size:14px;line-height:1.35}
+#clsOv .st.ok{background:#E6F3EA;color:#1f5c38}#clsOv .st.bad{background:#FBE9E5;color:#9a2c1a}
+#clsOv .acts{display:flex;gap:8px;margin-top:14px}#clsOv .acts .btn{flex:1}
+#clsOv .chk2{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:14px}#clsOv .chk2 input{width:auto}
 .sigpick{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
 .sigpick .sp{background:#fff;border:1.5px solid var(--line,#ccd);border-radius:10px;padding:4px;width:calc(50% - 4px);display:flex;flex-direction:column;align-items:center}
 .sigpick .sp img{width:100%;height:56px;object-fit:contain}
@@ -412,7 +421,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v94</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v96</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -422,6 +431,7 @@ svg.bchart{height:15px}
     </select>
     <select id="cardSel" style="width:auto;min-width:150px;padding:9px 30px 9px 10px;font-size:14px"></select>
     <button class="btn" id="btnNew">Новая карта</button>
+    <button class="btn" id="btnClose">Закрыть и начать новую</button>
     <button class="btn ghost" id="btnRename">Переименовать</button>
     <button class="btn ghost" id="btnEmpty">Пустые</button>
     <button class="btn ghost" id="btnGfx">Графика ✓</button>
@@ -653,20 +663,96 @@ function prevSig(which){
   return "";
 }
 
+/* ===== Постоянная библиотека подписей и список авто (не зависят от карт) ===== */
+function plKey(x){ return String(x||"").toUpperCase().replace(/[^A-Z0-9]/g,""); }
+function syncLib(){
+  if(!DB) return;
+  if(!Array.isArray(DB.sigLib)) DB.sigLib = [];
+  if(!Array.isArray(DB.veh)) DB.veh = [];
+  (DB.cards||[]).forEach(function(c){
+    if(!c) return;
+    [["k1","k1i","k1n"],["k2","k2i","k2n"]].forEach(function(a){
+      const v = c.sig && c.sig[a[0]]; if(!v) return;
+      const h = c.head || {}, i = String(h[a[1]]||"").trim(), n = String(h[a[2]]||"").trim();
+      let e = null; for(let j=0;j<DB.sigLib.length;j++) if(DB.sigLib[j].v===v){ e = DB.sigLib[j]; break; }
+      if(!e){ DB.sigLib.push({id:uid(), v:v, i:i, n:n}); }
+      else if(!e.i && !e.n && (i||n)){ e.i=i; e.n=n; }
+    });
+    const pl = String((c.head && c.head.nrRej)||"").trim().toUpperCase();
+    if(pl && !DB.veh.some(function(x){ return plKey(x)===plKey(pl); })) DB.veh.push(pl);
+  });
+  let dl = document.getElementById("vehList");
+  if(!dl){ dl = document.createElement("datalist"); dl.id = "vehList"; document.body.appendChild(dl); }
+  dl.innerHTML = DB.veh.map(function(x){ return '<option value="'+esc(x)+'">'; }).join("");
+}
+function libName(e, k){ const t = ((e.i||"")+" "+(e.n||"")).trim(); return t || (LX("Подпись ","Підпис ","Podpis ") + (k+1)); }
+
+function closeCardDlg(){
+  syncLib();
+  const old = C, oldPl = plateOf(old), st = old.stany || {};
+  const lib = DB.sigLib;
+  const idxOf = function(v){ for(let j=0;j<lib.length;j++) if(lib[j].v===v) return j; return -1; };
+  const opts = function(sel){ return '<option value="-1">'+LX("— никого —","— нікого —","— nikt —")+'</option>' +
+    lib.map(function(e,k){ return '<option value="'+k+'"'+(k===sel?' selected':'')+'>'+esc(libName(e,k))+'</option>'; }).join(""); };
+  const ov = document.createElement("div"); ov.id = "clsOv";
+  const base = (old.name||"").replace(/\s+/g," ").trim();
+  ov.innerHTML = '<div class="bx"><h3>'+LX("Закрыть карту и начать новую","Закрити карту й почати нову","Zamknij kartę i zacznij nową")+'</h3>'+
+    '<label>'+LX("Название новой карты","Назва нової карти","Nazwa nowej karty")+'</label><input id="cl_name" value="Karta '+new Date().toLocaleDateString("ru-RU")+'">'+
+    '<label>'+LX("Госномер авто","Держномер авто","Nr rejestracyjny")+'</label><input id="cl_pl" list="vehList" autocapitalize="characters" value="'+esc(old.head.nrRej||"")+'">'+
+    '<div id="cl_st" class="st"></div>'+
+    '<div id="cl_force" class="chk2" style="display:none"><input type="checkbox" id="cl_f"><span>'+LX("Всё равно перенести пробег и остатки","Усе одно перенести пробіг і залишки","Mimo to przenieś przebieg i stany")+'</span></div>'+
+    '<label>'+LX("Водитель 1 (подпись в первой ячейке)","Водій 1 (підпис у першій клітинці)","Kierowca 1 (podpis w pierwszej komórce)")+'</label><select id="cl_d1">'+opts(idxOf(old.sig && old.sig.k1))+'</select>'+
+    '<label>'+LX("Водитель 2","Водій 2","Kierowca 2")+'</label><select id="cl_d2">'+opts(idxOf(old.sig && old.sig.k2))+'</select>'+
+    '<div class="acts"><button class="btn ghost" id="cl_no">'+LX("Отмена","Скасувати","Anuluj")+'</button><button class="btn" id="cl_ok">'+LX("Создать","Створити","Utwórz")+'</button></div></div>';
+  document.body.appendChild(ov);
+  const q = function(id){ return ov.querySelector("#"+id); };
+  const carry = function(){
+    const pl = plKey(q("cl_pl").value);
+    const same = !!oldPl && pl === oldPl;
+    const have = [st.kmK, st.palK, st.adbK].some(function(x){ return String(x||"").trim() !== ""; });
+    const box = q("cl_st"); let force = false;
+    if(same){
+      box.className = "st ok";
+      box.innerHTML = '✓ '+LX("Тот же авто. Перенесу в начало: пробег ","Той самий авто. Перенесу на початок: пробіг ","Ten sam pojazd. Przeniosę na start: przebieg ")+'<b>'+esc(st.kmK||"—")+'</b>, '+LX("топливо ","пальне ","paliwo ")+'<b>'+esc(st.palK||"—")+'</b>, AdBlue <b>'+esc(st.adbK||"—")+'</b>'+
+        (have ? "" : '<br>'+LX("На старой карте конечные значения не заполнены.","На старій карті кінцеві значення не заповнені.","Na starej karcie brak wartości końcowych."));
+    } else {
+      box.className = "st bad";
+      box.innerHTML = '⚠ '+(oldPl ? LX("Другой авто: на закрываемой карте ","Інший авто: на закритій карті ","Inny pojazd: na zamykanej karcie ")+'<b>'+esc(old.head.nrRej)+'</b>. ' : LX("На старой карте не указан госномер. ","На старій карті не вказано номер. ","Na starej karcie brak numeru. "))+
+        LX("Пробег и остатки НЕ переношу.","Пробіг і залишки НЕ переношу.","Przebiegu i stanów NIE przenoszę.");
+      force = have;
+    }
+    q("cl_force").style.display = force ? "flex" : "none";
+    return {same:same, force:force};
+  };
+  q("cl_pl").addEventListener("input", carry); carry();
+  const done = function(){ ov.remove(); };
+  q("cl_no").onclick = done;
+  ov.addEventListener("click", function(e){ if(e.target===ov) done(); });
+  q("cl_ok").onclick = function(){
+    const r = carry();
+    const e1 = lib[+q("cl_d1").value], e2 = lib[+q("cl_d2").value];
+    const nc = newCard(q("cl_name").value.trim(), {k1: e1 ? e1.v : "", k2: e2 ? e2.v : ""});
+    nc.head.nrRej = q("cl_pl").value.trim().toUpperCase();
+    nc.head.paliwo = old.head.paliwo || "ON";
+    if(e1){ nc.head.k1i = e1.i||""; nc.head.k1n = e1.n||""; }
+    if(e2){ nc.head.k2i = e2.i||""; nc.head.k2n = e2.n||""; }
+    const doCarry = r.same || (r.force && q("cl_f").checked);
+    if(doCarry){ nc.stany.kmP = st.kmK||""; nc.stany.palP = st.palK||""; nc.stany.adbP = st.adbK||""; }
+    DB.cards.push(nc); DB.active = nc.id; C = nc; rememberSig(); syncLib(); save(true); renderAll(); done();
+    toast(doCarry ? "Новая карта создана, остатки перенесены" : "Новая карта создана");
+  };
+}
+
 let SIGPICK = "";
 /* все разные подписи, что есть на картах: для выбора в любую ячейку */
 function sigChoices(){
-  const out = [], seen = {};
-  const list = ((DB && DB.cards) || []).slice().reverse();
-  list.forEach(c=>{ if(!c || !c.sig) return;
-    [["k1",1],["k2",2]].forEach(a=>{ const v = c.sig[a[0]]; if(!v || seen[v]) return; seen[v] = 1;
-      out.push({v:v, card:c.name||"", slot:a[1]}); }); });
-  return out;
+  syncLib();
+  return DB.sigLib.map(function(e,k){ return {v:e.v, card:libName(e,k), slot:""}; }).reverse();
 }
 function sigGallery(path){
   const ch = sigChoices();
   if(!ch.length) return '<div class="hint">'+LX("Сохранённых подписей пока нет","Збережених підписів поки немає","Brak zapisanych podpisów")+'</div>';
-  return '<div class="sigpick">'+ch.map((x,i)=>'<button class="sp" data-sigset="'+path+'|'+i+'"><img src="'+x.v+'" alt=""><small>'+esc(x.card)+' · '+x.slot+'</small></button>').join("")+'</div>';
+  return '<div class="sigpick">'+ch.map((x,i)=>'<button class="sp" data-sigset="'+path+'|'+i+'"><img src="'+x.v+'" alt=""><small>'+esc(x.card)+'</small></button>').join("")+'</div>';
 }
 function rememberSig(){
   try{ if(C && C.sig) DB.lastSig = {k1: C.sig.k1 || "", k2: C.sig.k2 || ""}; }catch(e){}
@@ -825,6 +911,7 @@ function renderList(list){
 /* ================= Сохранение ================= */
 let saveT;
 function save(now){
+  try{ syncLib(); }catch(e){}
   $("#saveState").textContent = T("сохраняю…");
   renderCab();
   clearTimeout(saveT);
@@ -1013,7 +1100,7 @@ function renderMain(){
       ${fcIn("head.nrTeczki","Numer Teczki")}
     </div>
     <div class="r c2">
-      ${fcIn("head.nrRej","Samochód — Nr rej.","госномер")}
+      ${fcIn("head.nrRej","Samochód — Nr rej.","госномер",'list="vehList" autocapitalize="characters"')}
       ${fcIn("head.paliwo","Rodzaj paliwa","вид топлива")}
     </div>
     <div class="r c2"><div class="hd">Kierowca 1</div><div class="hd">Kierowca 2</div></div>
@@ -2303,7 +2390,7 @@ function whyTxt(arr){
       "після попереднього каботажу ("+dfmt(w.last)+") ще не минула пауза "+w.cool+" дн. — каботаж можна з "+dfmt(w.last+w.cool+1),
       "po poprzednim kabotażu ("+dfmt(w.last)+") nie minęła przerwa "+w.cool+" dni — kabotaż możliwy od "+dfmt(w.last+w.cool+1));
     return "";
-  }).join("; ");
+  }).map(function(t,i){ const w = arr[i], ref = w.k==="pause" ? "8(2a)" : "8(2)"; return t ? t + " [1072/2009, art. " + ref + "]" : t; }).join("; ");
 }
 function prevRel(x){
   const pv = x.prev; if(!pv || !pv.ops.length) return null;
@@ -2362,7 +2449,7 @@ function printCab(){
       '<div class="itosub">' + esc(C.name || "") + ' · stan na ' + esc(fmtD(todayISO())) + '</div></div>' +
       '<div class="itosub" style="text-align:right">' + esc(h.nrRej || "") + '<br>' + esc(kier) + '</div></div>' +
     body +
-    '<div class="itofoot">UE i Norwegia (rozp. (UE) 2020/1055): po dostawie międzynarodowej do 3 operacji kabotażowych w ciągu 7 dni, następnie 4 dni przerwy w tym samym kraju. ' +
+    '<div class="itofoot">Podstawa prawna: rozporządzenie (WE) nr 1072/2009, art. 8 ust. 2 (po dostawie międzynarodowej do 3 operacji kabotażowych w ciągu 7 dni od rozładunku; ten sam pojazd) oraz art. 8 ust. 2a (4 dni przerwy w tym samym kraju), w brzmieniu nadanym rozporządzeniem (UE) 2020/1055. ' +
       'Wielka Brytania: do 2 operacji w ciągu 7 dni. Szwajcaria: kabotaż zabroniony. Zestawienie sporządzone na podstawie wpisów kierowcy w karcie drogowej; dokumenty potwierdzające: CMR i zlecenia.</div>' +
     sigBlock() + '</div>';
   LG = null;
@@ -2427,6 +2514,23 @@ function cabTimeline(c, items, today){
     '<div class="tlleg"><span><i class="lg dl"></i>'+LX("доставка в страну","доставка в країну","dostawa do kraju")+'</span><span><i class="lg wn"></i>'+LX("окно: можно","вікно: можна","okno: można")+'</span><span><i class="lg pz"></i>'+LX("пауза: нельзя","пауза: не можна","przerwa: nie wolno")+'</span><span><i class="oc">1</i>'+LX("рейс внутри страны","рейс всередині країни","przewóz wewnątrz kraju")+'</span><span><i class="oc bad">!</i>'+LX("нарушение","порушення","naruszenie")+'</span></div></div>';
 }
 
+function lawBlock(){
+  const h = function(t){ return '<div style="font-weight:700;margin:10px 0 2px">'+t+'</div>'; };
+  const art = function(t){ return '<span style="color:var(--amber);font-weight:700">'+t+'</span>'; };
+  return '<details class="card" style="margin-top:10px"><summary style="font-weight:700;font-size:15px;cursor:pointer">'+LX("📜 Закон: правила и основания","📜 Закон: правила й підстави","📜 Przepisy i podstawa prawna")+'</summary>' +
+    '<div style="font-size:13.5px;line-height:1.45;margin-top:6px">' +
+    '<div class="hint">'+LX("Регламент (ЕС) № 1072/2009 (общие правила доступа к рынку международных автоперевозок), ст. 8, в редакции Регламента (ЕС) 2020/1055 («Пакет мобильности»).","Регламент (ЄС) № 1072/2009, ст. 8, у редакції Регламенту (ЄС) 2020/1055 («Пакет мобільності»).","Rozporządzenie (WE) nr 1072/2009, art. 8, w brzmieniu rozporządzenia (UE) 2020/1055 (Pakiet Mobilności).")+'</div>' +
+    h(LX("1. Что считается каботажем","1. Що вважається каботажем","1. Co to kabotaż")) + art("ст. 2 п. 6, ст. 8(1)") + ' — ' + LX("внутренняя перевозка за плату в другой стране ЕС, где перевозчик не зарегистрирован. Для тебя — любая внутренняя перевозка не в Польше.","внутрішнє перевезення за плату в іншій країні ЄС, де перевізник не зареєстрований.","przewóz krajowy za wynagrodzeniem w innym państwie UE niż państwo siedziby przewoźnika.") +
+    h(LX("2. Три операции за семь дней","2. Три операції за сім днів","2. Trzy operacje w siedem dni")) + art("ст. 8(2)") + ' — ' + LX("после выгрузки международного груза в стране можно сделать до 3 каботажных операций тем же автомобилем. Последняя выгрузка — не позднее 7 дней после выгрузки международного груза. Неиспользованные операции не переносятся.","після розвантаження міжнародного вантажу в країні можна зробити до 3 операцій тим самим авто. Останнє розвантаження — не пізніше 7 днів. Невикористані операції не переносяться.","po rozładunku przesyłki międzynarodowej do 3 operacji tym samym pojazdem; ostatni rozładunek najpóźniej w 7. dniu. Niewykorzystane operacje nie przechodzą.") +
+    h(LX("3. Пауза 4 дня","3. Пауза 4 дні","3. Przerwa 4 dni")) + art("ст. 8(2a)") + ' — ' + LX("после каботажа в стране тем же автомобилем нельзя делать каботаж в ней ещё 4 дня (считая с последней выгрузки). Новый международный груз в эту страну паузу не отменяет.","після каботажу в країні тим самим авто не можна робити каботаж у ній ще 4 дні. Новий міжнародний вантаж паузу не скасовує.","po kabotażu w danym państwie ten sam pojazd nie może wykonywać w nim kabotażu przez 4 dni. Nowy przewóz międzynarodowy nie skraca przerwy.") +
+    h(LX("4. Въезд порожним","4. Заїзд порожнім","4. Wjazd bez ładunku")) + art("ст. 8(2)") + ' — ' + LX("если ты въехал в страну порожним: только одна операция в этой стране, в течение 3 дней после въезда. ","якщо в’їхав порожнім: лише одна операція в країні протягом 3 днів. ","przy wjeździe bez ładunku: tylko jedna operacja w danym państwie, w ciągu 3 dni od wjazdu. ") + '<b>'+LX("Приложение это правило пока не проверяет.","Застосунок це правило поки не перевіряє.","Aplikacja tej zasady jeszcze nie sprawdza.")+'</b>' +
+    h(LX("5. Документы","5. Документи","5. Dokumenty")) + art("ст. 8(5)") + ' — ' + LX("CMR международной перевозки и документ на каждую каботажную операцию (дата выгрузки, госномер); хранить для проверки.","CMR міжнародного перевезення й документ на кожну операцію (дата розвантаження, номер авто).","CMR przewozu międzynarodowego i dokument każdej operacji kabotażowej (data rozładunku, numer rejestracyjny).") +
+    h(LX("6. Несколько точек выгрузки","6. Кілька точок розвантаження","6. Wiele miejsc rozładunku")) + LX("Позиция Еврокомиссии (разъяснения к Пакету мобильности): рейс с несколькими выгрузками по одному договору перевозки — одна операция. Это не статья, а трактовка; проверяющие в странах иногда считают иначе.","Позиція Єврокомісії: рейс із кількома розвантаженнями за одним договором — одна операція. Це трактування, а не стаття.","Stanowisko Komisji Europejskiej: przewóz z wieloma rozładunkami na jednej umowie to jedna operacja. To wykładnia, nie przepis.") +
+    h(LX("7. Великобритания и Швейцария","7. Велика Британія та Швейцарія","7. Wielka Brytania i Szwajcaria")) + LX("Великобритания: соглашение ЕС–Великобритания (TCA), до 2 операций за 7 дней. Швейцария: каботаж запрещён (соглашение ЕС–Швейцария о наземном транспорте). Норвегия: правила ЕС.","Велика Британія: угода ЄС–ВБ (TCA), до 2 операцій за 7 днів. Швейцарія: каботаж заборонено. Норвегія: правила ЄС.","Wielka Brytania: umowa UE–UK (TCA), do 2 operacji w 7 dni. Szwajcaria: kabotaż zabroniony. Norwegia: przepisy UE.") +
+    '<div class="hint" style="margin-top:10px">'+LX("Номера пунктов сверяй с текстом на EUR-Lex (eur-lex.europa.eu → 32009R1072 и 32020R1055). Приложение — подсказка по твоим записям, не юридическое заключение; окончательно решают CMR и дата выгрузки.","Номери пунктів звіряй з текстом на EUR-Lex (32009R1072 і 32020R1055). Застосунок — підказка, не юридичний висновок.","Numery ustępów sprawdź na EUR-Lex (32009R1072 i 32020R1055). Aplikacja to podpowiedź, nie opinia prawna.")+'</div>' +
+    '<div class="row2" style="margin-top:8px"><a class="btn" target="_blank" rel="noopener" href="https://eur-lex.europa.eu/eli/reg/2009/1072/oj">1072/2009</a><a class="btn" target="_blank" rel="noopener" href="https://eur-lex.europa.eu/eli/reg/2020/1055/oj">2020/1055</a></div>' +
+    '</div></details>';
+}
 function renderCabPane(r){
   const el = $("#pane-cab"); if(!el) return;
   const D_ = n => fmtD(isoOf(n));
@@ -2442,7 +2546,7 @@ function renderCabPane(r){
     "перевезення всередині чужої країни (не Польщі) після міжнародної доставки в неї. ЄС і Норвегія: до 3 операцій за 7 днів, потім пауза 4 дні. Англія: до 2 за 7 днів. Швейцарія: заборонено. Рахується сам за країнами і датами з Trasa.",
     "przewóz wewnątrz obcego kraju (nie Polski) po dostawie międzynarodowej do niego. UE i Norwegia: do 3 operacji w 7 dni, potem 4 dni przerwy. Wielka Brytania: do 2 w 7 dni. Szwajcaria: zabroniony. Liczy się sam wg krajów i dat z Trasa.")+'</p>';
   if(!groups.length && !wins.length){
-    el.innerHTML = '<div class="card"><h3>'+LX("Каботаж","Каботаж","Kabotaż")+'</h3><p class="hint" style="font-size:14px">'+LX("Пока каботажа нет. Заполни в Trasa страны и даты загрузки и выгрузки — здесь всё посчитается само.","Поки каботажу немає. Заповни в Trasa країни та дати завантаження і розвантаження — тут усе пораховується само.","Na razie brak kabotażu. Wpisz w Trasa kraje i daty załadunku i rozładunku — tu wszystko policzy się samo.")+'</p></div>' + intro;
+    el.innerHTML = '<div class="card"><h3>'+LX("Каботаж","Каботаж","Kabotaż")+'</h3><p class="hint" style="font-size:14px">'+LX("Пока каботажа нет. Заполни в Trasa страны и даты загрузки и выгрузки — здесь всё посчитается само.","Поки каботажу немає. Заповни в Trasa країни та дати завантаження і розвантаження — тут усе пораховується само.","Na razie brak kabotażu. Wpisz w Trasa kraje i daty załadunku i rozładunku — tu wszystko policzy się samo.")+'</p></div>' + intro + lawBlock();
     return;
   }
   let html = '<button class="btn primary" id="btnCabPrint" style="width:100%;margin:10px 0 0">'+LX("Лист для координатора","Аркуш для координатора","Zestawienie dla koordynatora")+'</button>';
@@ -2483,7 +2587,7 @@ function renderCabPane(r){
       (n ? '<div class="ops">'+g.ops.map((o,k)=>'<div><i>'+(k+1)+'. '+esc(dfmt(o.d))+'</i><span>'+esc(o.nr||"—")+' · '+esc(o.zm||"?")+' → '+esc(o.wm||"?")+'</span></div>').join("")+'</div>' : '') +
       '</div>';
   });
-  el.innerHTML = html + winCard + intro;
+  el.innerHTML = html + winCard + intro + lawBlock();
   el.querySelectorAll(".tl").forEach(t=>{ const td = t.querySelector(".td"); if(td) t.scrollLeft = Math.max(0, td.offsetLeft - t.clientWidth/2); });
 }
 
@@ -2785,6 +2889,7 @@ document.addEventListener("click", async e=>{
       const c = newCard(n.trim(), sg);
       DB.cards.push(c); DB.active=c.id; C=c; save(true); renderAll();
       toast(sg ? "Карта создана, подпись перенесена" : "Карта создана"); break; }
+    case "btnClose": closeCardDlg(); break;
     case "btnRename": { const n = prompt(T("Название карты:"), C.name); if(n===null) return; C.name=n.trim()||C.name; save(true); renderCards(); break; }
     case "btnDel": { if(DB.cards.length<2){ toast("Это единственная карта"); return; }
       if(!confirm(T(`Удалить «${C.name}»? Данные пропадут.`))) return;
@@ -2813,6 +2918,8 @@ $("#fileIn").addEventListener("change", e=>{
   const r = new FileReader();
   r.onload = ()=>{ try{
       const data = JSON.parse(r.result);
+      if(Array.isArray(data.sigLib)){ DB.sigLib = DB.sigLib||[]; data.sigLib.forEach(e=>{ if(e && e.v && !DB.sigLib.some(x=>x.v===e.v)) DB.sigLib.push(e); }); }
+      if(Array.isArray(data.veh)){ DB.veh = DB.veh||[]; data.veh.forEach(x=>{ if(x && !DB.veh.some(y=>plKey(y)===plKey(x))) DB.veh.push(x); }); }
       if(data.mycards){ ["fuel","bank"].forEach(k=> (data.mycards[k]||[]).forEach(n=> addMyCard(k,n))); }
       const list = Array.isArray(data.cards) ? data.cards : [data];
       let added = 0;
@@ -2987,6 +3094,7 @@ if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   DB.active = C.id;
   // добить недостающие поля после обновлений
   const base = newCard(); for(const k in base){ if(C[k]===undefined) C[k]=base[k]; }
+  try{ syncLib(); }catch(e){}
   renderAll();
   $("#saveState").textContent = T("готово");
   maybeAutoBackup();
