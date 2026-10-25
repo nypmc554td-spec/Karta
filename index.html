@@ -412,7 +412,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v93</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v94</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1999,12 +1999,13 @@ function printPage2(){
 
 function printPage3(){
   const dl = (v,n)=> v? esc(v) : ".".repeat(n);
+  const dk = (v,n)=> v? pKr(v) : ".".repeat(n);
   const zak = pad(C.zakupy,LIMITS.zakupy,blank.zakupy).map((r,i)=>
-    `<div>${i+1}. Za co: ${dl(r.co,52)} Data: ${dl(fmtD(r.d,true),10)} Bank: ${dl(r.bank,10)} Kwota: ${dl(kwotaTxt(r),11)} Kraj: ${dl(r.kraj,5)}</div>`).join("");
+    `<div>${i+1}. Za co: ${dl(r.co,52)} Data: ${dl(fmtD(r.d,true),10)} Bank: ${dl(r.bank,10)} Kwota: ${dl(kwotaTxt(r),11)} Kraj: ${dk(r.kraj,5)}</div>`).join("");
   const lst = (list,n)=> pad(C[list],LIMITS[list],blank.oplaty).map((r,i)=>
-    `<div>${i+1}. Za co: ${dl(r.co,n)} Data: ${dl(fmtD(r.d,true),10)} Rodzaj karty: ${dl(r.karta,16)} Kwota: ${dl(kwotaTxt(r),11)} Kraj: ${dl(r.kraj,7)}</div>`).join("");
+    `<div>${i+1}. Za co: ${dl(r.co,n)} Data: ${dl(fmtD(r.d,true),10)} Rodzaj karty: ${dl(r.karta,16)} Kwota: ${dl(kwotaTxt(r),11)} Kraj: ${dk(r.kraj,7)}</div>`).join("");
   const wl = pad(C.wlasne,LIMITS.wlasne,blank.wlasne).map((r,i)=>
-    `<div>${i+1}. Za co: ${dl(r.co,20)} Data: ${dl(fmtD(r.d,true),12)} Kwota ${dl(kwotaTxt(r),14)} Kraj: ${dl(r.kraj,14)} Kierowca: ${dl(r.kier,12)}</div>`).join("");
+    `<div>${i+1}. Za co: ${dl(r.co,20)} Data: ${dl(fmtD(r.d,true),12)} Kwota ${dl(kwotaTxt(r),14)} Kraj: ${dk(r.kraj,14)} Kierowca: ${dl(r.kier,12)}</div>`).join("");
   return `<div class="sheet${coCls()}">${coLogo()}
     <div class="h1" style="font-size:11pt">DODATKOWE ZAKUPY KARTĄ BANKOWĄ LUB GOTÓWKĄ</div>
     <div class="lines">${zak}</div>
