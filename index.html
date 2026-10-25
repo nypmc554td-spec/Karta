@@ -55,6 +55,7 @@ nav::-webkit-scrollbar{display:none}
 main{padding:0 12px 90px}
 section.pane{display:none}
 section.pane.on{display:block}
+.big{font-size:30px;font-weight:700}.ptb{width:100%;margin:8px 0;border-collapse:collapse}.ptb td{padding:4px 0;border-bottom:1px solid var(--line)}.ptb td:last-child{text-align:right;white-space:nowrap}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin:10px 0}
 .card > h3{
   margin:0 0 10px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);font-weight:700;
@@ -430,7 +431,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v107</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v108</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -460,6 +461,7 @@ svg.bchart{height:15px}
   <section class="pane" id="pane-koszty"></section>
   <section class="pane" id="pane-itogi"></section>
   <section class="pane" id="pane-cab"></section>
+  <section class="pane" id="pane-pay"></section>
   <section class="pane" id="pane-info"></section>
 </main>
 
@@ -857,7 +859,7 @@ I18N.ua["Нечего переносить"] = "Нічого переносит�
 I18N.pl["Нечего переносить"] = "Nie ma czego przenosić";/* --- строки экрана «Итоги» --- */
 (function(){
   const ADD = {
-    ua: {"Итоги":"Підсумки","Итоги месяца":"Підсумки місяця","Ночная работа · окно 22:00–05:00":"Нічна робота · вікно 22:00–05:00",
+    ua: {"Зарплата":"Зарплата","Итоги":"Підсумки","Итоги месяца":"Підсумки місяця","Ночная работа · окно 22:00–05:00":"Нічна робота · вікно 22:00–05:00",
       "Всего":"Разом","Ночей задействовано":"Ночей задіяно","из":"з","Средняя рабочая ночь":"Середня робоча ніч","Полных ночей":"Повних ночей",
       "Расход ON":"Витрата ON","Объём работы":"Обсяг роботи","Пробег":"Пробіг","Заказов":"Замовлень","Порожний пробег":"Порожній пробіг",
       "норма ЕС":"норма ЄС","типовой":"типовий","Вес всего":"Вага разом","Пробег машины":"Пробіг машини","Разброс по отрезкам":"Розкид по відрізках",
@@ -868,7 +870,7 @@ I18N.pl["Нечего переносить"] = "Nie ma czego przenosić";/* --- 
       "Расход посчитается, когда будет хотя бы две заправки do pełna с показаниями счётчика.":"Витрата порахується, коли буде щонайменше дві заправки do pełna з показаннями лічильника.",
       "Пока нечего считать. Заполните Trasa и заправки — итоги соберутся сами.":"Поки нема чого рахувати. Заповніть Trasa і заправки — підсумки зберуться самі.",
       "Счётчик сходится, показания закрыты, чеки на месте.":"Лічильник сходиться, показання закриті, чеки на місці."},
-    pl: {"Итоги":"Podsumowanie","Итоги месяца":"Podsumowanie miesiąca","Ночная работа · окно 22:00–05:00":"Praca nocna · okno 22:00–05:00",
+    pl: {"Зарплата":"Wypłata","Итоги":"Podsumowanie","Итоги месяца":"Podsumowanie miesiąca","Ночная работа · окно 22:00–05:00":"Praca nocna · okno 22:00–05:00",
       "Всего":"Łącznie","Ночей задействовано":"Nocy z pracą","из":"z","Средняя рабочая ночь":"Średnia noc","Полных ночей":"Pełnych nocy",
       "Расход ON":"Spalanie ON","Объём работы":"Praca","Пробег":"Przebieg","Заказов":"Zlecenia","Порожний пробег":"Puste przebiegi",
       "норма ЕС":"średnia UE","типовой":"typowy","Вес всего":"Waga łącznie","Пробег машины":"Stan licznika","Разброс по отрезкам":"Rozrzut na odcinkach",
@@ -1112,7 +1114,7 @@ function cardF(path,label,kind){
 }
 
 /* ================= Экраны ================= */
-const TABS = [["main","Карта"],["trasa","Trasa"],["cab","Каботаж"],["tank","Заправки"],["koszty","Расходы"],["itogi","Итоги"],["info","Инструкция"]];
+const TABS = [["main","Карта"],["trasa","Trasa"],["cab","Каботаж"],["tank","Заправки"],["koszty","Расходы"],["itogi","Итоги"],["pay","Зарплата"],["info","Инструкция"]];
 let activeTab = "main";
 
 function renderTabs(){
@@ -1796,6 +1798,69 @@ function krajName(k){
 function n1(v){ return (Math.round(v * 10) / 10).toFixed(1).replace(".", ","); }
 function nkm(v){ return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
 
+
+/* ================= Калькулятор зарплаты (приблизительно) ================= */
+const PAYDEF = {days:42, mode:"cycle", day:290, base:3608, eco:900, prem:1550, dm:30.4, wk:6, home:""};
+function payS(){ DB.pay = Object.assign({}, PAYDEF, DB.pay||{}); return DB.pay; }
+function payCalc(){
+  const P = payS(), n = k=>{ const v=parseFloat(String(P[k]).replace(",",".")); return isFinite(v)?v:0; };
+  const D = Math.max(0,n("days")), day=n("day"), mon=n("base")+n("eco")+n("prem"), dm=n("dm")||30.4;
+  const rd = Math.round;
+  if(P.mode==="month"){
+    return {mode:"month", D, abroad:D*day, base:n("base"), eco:n("eco"), prem:n("prem"), total:D*day+mon};
+  }
+  const H = P.home!=="" && isFinite(parseFloat(P.home)) ? Math.max(0,parseFloat(P.home)) : rd(D/7*2);
+  const cyc = D+H, fixed = mon*cyc/dm, abroad = D*day;
+  const total = abroad+fixed;
+  return {mode:"cycle", D, H, cyc, abroad, fixed, homePay: H*mon/dm, total, avg: cyc? total/cyc*dm : 0, dayDay: cyc? total/cyc : 0, mon};
+}
+const fz = x => Math.round(x).toLocaleString("ru-RU").replace(/ /g," ")+" zł";
+function payOut(){
+  const el = $("#payOut"); if(!el) return;
+  const r = payCalc(), T = (a,b,c)=>LX(a,b,c);
+  let h = "";
+  if(r.mode==="month"){
+    h += `<div class="big">${fz(r.total)}</div><div class="hint">${T("на руки за месяц, примерно","на руки за місяць, приблизно","na rękę za miesiąc, orientacyjnie")}</div>`;
+    h += `<table class="ptb"><tr><td>${r.D} × ${fz(payS().day)} ${T("за границей","за кордоном","za granicą")}</td><td>${fz(r.abroad)}</td></tr>
+    <tr><td>${T("Оклад","Оклад","Podstawa")}</td><td>${fz(r.base)}</td></tr>
+    <tr><td>Eco</td><td>${fz(r.eco)}</td></tr><tr><td>${T("Премия","Премія","Premia")}</td><td>${fz(r.prem)}</td></tr></table>`;
+  } else {
+    h += `<div class="big">${fz(r.total)}</div><div class="hint">${T("за весь цикл","за весь цикл","za cały cykl")}: ${r.D} ${T("дн. в рейсе","дн. у рейсі","dni w trasie")} + ${r.H} ${T("дн. дома","дн. вдома","dni w domu")} = ${r.cyc} ${T("дн.","дн.","dni")}</div>`;
+    h += `<table class="ptb"><tr><td>${T("За границей","За кордоном","Za granicą")}: ${r.D} × ${fz(payS().day)}</td><td>${fz(r.abroad)}</td></tr>
+    <tr><td>${T("Оклад + eco + премия за","Оклад + eco + премія за","Podstawa + eco + premia za")} ${r.cyc} ${T("дн.","дн.","dni")}</td><td>${fz(r.fixed)}</td></tr></table>
+    <div class="card" style="margin:8px 0"><b>${T("Дома","Вдома","W domu")}: ${r.H} ${T("дн.","дн.","dni")}</b><br>${T("Оплачиваются по окладу","Оплачуються за окладом","Płatne wg podstawy")} ≈ <b>${fz(r.homePay)}</b> (${fz(r.mon/ (payS().dm||30.4))} ${T("в день","на день","za dzień")})</div>
+    <div class="card" style="margin:8px 0">${T("В среднем за 30 дней","У середньому за 30 днів","Średnio na 30 dni")}: <b>${fz(r.avg)}</b><br><span class="hint">≈ ${fz(r.dayDay)} ${T("за каждый календарный день цикла","за кожен календарний день циклу","za każdy dzień kalendarzowy cyklu")}</span></div>`;
+  }
+  h += `<p class="hint">${T("⚠ Приблизительно. Это не расчётный листок: точная сумма зависит от курса, налогов, ZUS и решения фирмы.","⚠ Приблизно. Це не розрахунковий листок: точна сума залежить від курсу, податків, ZUS і рішення фірми.","⚠ Orientacyjnie. To nie jest pasek płacowy: dokładna kwota zależy od kursu, podatków, ZUS i decyzji firmy.")}</p>`;
+  el.innerHTML = h;
+}
+function renderPay(){
+  const el = $("#pane-pay"); if(!el) return;
+  const P = payS(), T=(a,b,c)=>LX(a,b,c);
+  const f = (k,l,st)=>`<label class="fc"><span>${l}</span><input data-pay="${k}" inputmode="decimal" value="${esc(P[k])}" ${st||""}></label>`;
+  el.innerHTML = `<div class="card"><h3>${T("Калькулятор зарплаты","Калькулятор зарплати","Kalkulator wypłaty")}</h3>
+  <div class="row2"><button class="btn ${P.mode==="cycle"?"pri":""}" data-paymode="cycle">${T("Весь цикл","Весь цикл","Cały cykl")}</button><button class="btn ${P.mode==="month"?"pri":""}" data-paymode="month">${T("Один месяц","Один місяць","Jeden miesiąc")}</button></div>
+  <div class="row2" style="margin-top:8px">${f("days",P.mode==="cycle"?T("Дней в рейсе (за границей)","Днів у рейсі (за кордоном)","Dni w trasie"):T("Дней за границей в месяце","Днів за кордоном у місяці","Dni za granicą w miesiącu"))}
+  ${P.mode==="cycle"?f("home",T("Дней дома (пусто = авто)","Днів вдома (порожньо = авто)","Dni w domu (puste = auto)")):""}</div>
+  <button class="btn" data-payfill="1" style="margin-top:6px">${T("Взять дни из текущей карты","Взяти дні з поточної карти","Weź dni z bieżącej karty")}</button>
+  <div class="hint" style="margin-top:6px">${P.mode==="cycle"?T("Дома = дни рейса ÷ 7 × 2 (6 недель → 12 дней).","Вдома = дні рейсу ÷ 7 × 2 (6 тижнів → 12 днів).","Dom = dni trasy ÷ 7 × 2 (6 tyg. → 12 dni)."):""}</div></div>
+  <div class="card" id="payOut"></div>
+  <details class="card"><summary><b>${T("Ставки (на руки, злотых)","Ставки (на руки, злотих)","Stawki (netto, zł)")}</b></summary>
+  <div class="row2">${f("day",T("За день за границей","За день за кордоном","Za dzień za granicą"))}${f("base",T("Оклад в месяц","Оклад на місяць","Podstawa / mies."))}</div>
+  <div class="row2">${f("eco","Eco / "+T("мес.","міс.","mies."))}${f("prem",T("Премия / мес.","Премія / міс.","Premia / mies."))}</div>
+  <div class="row2">${f("dm",T("Дней в месяце","Днів у місяці","Dni w miesiącu"))}</div></details>`;
+  payOut();
+}
+document.addEventListener("input", e=>{
+  const el = e.target.closest("[data-pay]"); if(!el) return;
+  payS()[el.dataset.pay] = el.value; save(); payOut();
+});
+document.addEventListener("click", e=>{
+  const m = e.target.closest("[data-paymode]");
+  if(m){ payS().mode = m.dataset.paymode; if(m.dataset.paymode==="month" && payS().days>31) payS().days=30; save(); renderPay(); return; }
+  if(e.target.closest("[data-payfill]")){ try{ const o=itogi(); if(o.dayCount) payS().days=o.dayCount; }catch(err){} save(); renderPay(); }
+});
+
 function renderItogi(){
   const o = itogi();
   if(!o.orders && !o.litres){
@@ -1934,7 +1999,7 @@ function buildItogiPrint(){
 
 function renderAll(){
   LANG_HOLD = true;
-  renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderItogi(); renderInfo();
+  renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderItogi(); renderPay(); renderInfo();
   renderCards(); fillBackupInfo(); paintRows(); applyHl();
   LANG_HOLD = false;
   applyLang();
@@ -2787,6 +2852,7 @@ document.addEventListener("click", async e=>{
 
   if(t.dataset.tab){ activeTab = t.dataset.tab; renderTabs();
     if(activeTab==="main") initSigs();
+    if(activeTab==="pay") renderPay();
     window.scrollTo({top:0}); return; }
 
   if(t.dataset.pc){
