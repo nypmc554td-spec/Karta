@@ -393,7 +393,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v90</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v91</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -2218,12 +2218,12 @@ function cabotage(){
     if(e.t === "int"){ if(s.g && s.g.ops.length) s.closed.push(s.g); s.g = {start:e.d, ops:[], cur:e.cur, nr:e.nr, from:e.from, city:e.city}; return; }
     const rule = cabRule(e.c), nm = krajName(e.c);
     let label = "", bad = false;
-    if(rule.ban){ add(e.cur,"r", nm+": "+LX("каботаж запрещён","каботаж заборонено","kabotaż zabroniony")); label = "⚠ "+LX("запрещён","заборонено","zakaz"); bad = true;
+    if(rule.ban){ add(e.cur,"r", nm+": "+LX("каботаж запрещён","каботаж заборонено","kabotaż zabroniony")); label = "🔴 "+LX("нельзя: в этой стране запрещено","не можна: в цій країні заборонено","nie wolno: w tym kraju zakaz"); bad = true;
       (s.ban || (s.ban = [])).push({d:e.d, e:e.e, cur:e.cur, bad:true, nr:e.nr, zm:e.zm, wm:e.wm, zd:e.zd, wd:e.wd}); }
     else if(rule.unknown){ return; }   // страны вне ЕС/UK/CH не считаем
     else{
       const g = s.g;
-      if(!g){ add(e.cur,"a", nm+": "+LX("не вижу международной доставки в эту страну перед внутренней перевозкой","не бачу міжнародної доставки в цю країну перед внутрішнім перевезенням","nie widzę dostawy międzynarodowej do tego kraju przed przewozem krajowym")); label = LX("нет доставки?","немає доставки?","brak dostawy?"); }
+      if(!g){ add(e.cur,"a", nm+": "+LX("не вижу международной доставки в эту страну перед внутренней перевозкой","не бачу міжнародної доставки в цю країну перед внутрішнім перевезенням","nie widzę dostawy międzynarodowej do tego kraju przed przewozem krajowym")); label = "🟡 "+LX("внутри страны — нет доставки в эту страну?","всередині країни — немає доставки в цю країну?","wewnątrz kraju — brak dostawy do tego kraju?"); }
       else{
         const n = g.ops.length + 1, why = [];
         if(e.e > g.start + rule.days){ add(e.cur,"r", nm+": "+LX("выгрузка позже "+rule.days+" дн. после международной доставки","розвантаження пізніше ніж "+rule.days+" дн. після міжнародної доставки","rozładunek później niż "+rule.days+" dni po dostawie międzynarodowej")); bad = true;
@@ -2238,9 +2238,9 @@ function cabotage(){
         }
         g.ops.push({d:e.d, e:e.e, cur:e.cur, bad:bad, why:why, cn:e.cn, nr:e.nr, zm:e.zm, wm:e.wm, zd:e.zd, wd:e.wd});
         if(bad){
-          const sh = why.map(w=> w.k==="late" ? LX("позже "+rule.days+" дн.","пізніше "+rule.days+" дн.","po "+rule.days+" dniach") : (w.k==="pause" ? LX("пауза","пауза","przerwa") : LX("лимит","ліміт","limit")));
-          label = "⚠ "+n+"/"+rule.max+" · "+sh.join(" + ");
-        }else label = LX("каботаж ","каботаж ","kabotaż ")+n+"/"+rule.max;
+          const sh = why.map(w=> w.k==="late" ? LX("выгрузка позже "+rule.days+" дн.","розвантаження пізніше "+rule.days+" дн.","rozładunek po "+rule.days+" dniach") : (w.k==="pause" ? LX("ещё пауза","ще пауза","jeszcze przerwa") : LX("больше "+rule.max,"більше "+rule.max,"więcej niż "+rule.max)));
+          label = "🔴 "+LX("нельзя: ","не можна: ","nie wolno: ")+sh.join(" + ");
+        }else label = "🟢 "+LX("внутри страны — можно ("+n+" из "+rule.max+")","всередині країни — можна ("+n+" з "+rule.max+")","wewnątrz kraju — można ("+n+" z "+rule.max+")");
       }
     }
     if(e.cur) rows[e.i] = {text:label, bad:bad};
@@ -2256,13 +2256,13 @@ function cabotage(){
     const nm = krajName(c), left = g.start + rule.days - today;
     if(g.ops.length){
       const opsLeft = rule.max - g.ops.length, lastEnd = g.ops[g.ops.length-1].e, pauseTo = lastEnd + rule.cool;
-      if(opsLeft > 0 && left >= 0) info.push({lvl:"a", txt:nm+": "+LX("каботаж "+g.ops.length+"/"+rule.max+" · осталось "+opsLeft+" оп., "+left+" дн. (выгрузить до "+dfmt(g.start+rule.days)+")","каботаж "+g.ops.length+"/"+rule.max+" · залишилось "+opsLeft+" оп., "+left+" дн. (розвантажити до "+dfmt(g.start+rule.days)+")","kabotaż "+g.ops.length+"/"+rule.max+" · zostało "+opsLeft+" op., "+left+" dni (rozładunek do "+dfmt(g.start+rule.days)+")")});
-      else if(rule.cool && today <= pauseTo) info.push({lvl:"a", txt:nm+": "+LX("пауза каботажа до "+dfmt(pauseTo)+" — со следующего дня можно снова","пауза каботажу до "+dfmt(pauseTo)+" — з наступного дня можна знову","przerwa w kabotażu do "+dfmt(pauseTo)+" — od następnego dnia można znowu")});
+      if(opsLeft > 0 && left >= 0) info.push({lvl:"a", txt:nm+": "+LX("🟢 можно ещё "+opsLeft+" рейса внутри страны, выгрузить до "+dfmt(g.start+rule.days),"🟢 можна ще "+opsLeft+" рейси всередині країни, розвантажити до "+dfmt(g.start+rule.days),"🟢 można jeszcze "+opsLeft+" przewozy wewnątrz kraju, rozładunek do "+dfmt(g.start+rule.days))});
+      else if(rule.cool && today <= pauseTo) info.push({lvl:"a", txt:nm+": "+LX("🟡 внутри страны нельзя до "+dfmt(pauseTo)+" включительно, дальше можно","🟡 всередині країни не можна до "+dfmt(pauseTo)+" включно, далі можна","🟡 wewnątrz kraju nie wolno do "+dfmt(pauseTo)+" włącznie, potem można")});
     }else if(left >= 0 && (!newest || g.start > newest.g.start)){
       newest = {c:c, g:g, nm:nm, rule:rule};
     }
   });
-  if(newest) info.push({lvl:"i", txt:newest.nm+": "+LX("можно до "+newest.rule.max+" каботажей, последняя выгрузка до "+dfmt(newest.g.start+newest.rule.days),"можна до "+newest.rule.max+" каботажів, останнє розвантаження до "+dfmt(newest.g.start+newest.rule.days),"można do "+newest.rule.max+" operacji kabotażowych, ostatni rozładunek do "+dfmt(newest.g.start+newest.rule.days))});
+  if(newest) info.push({lvl:"i", txt:newest.nm+": "+LX("🟢 можно до "+newest.rule.max+" рейсов внутри страны, последняя выгрузка до "+dfmt(newest.g.start+newest.rule.days),"🟢 можна до "+newest.rule.max+" рейсів всередині країни, останнє розвантаження до "+dfmt(newest.g.start+newest.rule.days),"🟢 można do "+newest.rule.max+" przewozów wewnątrz kraju, ostatni rozładunek do "+dfmt(newest.g.start+newest.rule.days))});
   const groups = [];
   Object.keys(st).forEach(k=>{ const s = st[k], c = s.c, arr = s.closed.concat(s.g ? [s.g] : []);
     arr.forEach((g,ix)=>groups.push({c:c, g:g, rule:cabRule(c), prev:(ix>0 ? arr[ix-1] : null)}));
