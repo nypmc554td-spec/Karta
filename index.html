@@ -393,7 +393,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v89</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v90</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -2237,7 +2237,10 @@ function cabotage(){
             why.push({k:"pause", last:last, cool:rule.cool}); }
         }
         g.ops.push({d:e.d, e:e.e, cur:e.cur, bad:bad, why:why, cn:e.cn, nr:e.nr, zm:e.zm, wm:e.wm, zd:e.zd, wd:e.wd});
-        label = (bad?"⚠ ":"")+LX("каботаж ","каботаж ","kabotaż ")+n+"/"+rule.max;
+        if(bad){
+          const sh = why.map(w=> w.k==="late" ? LX("позже "+rule.days+" дн.","пізніше "+rule.days+" дн.","po "+rule.days+" dniach") : (w.k==="pause" ? LX("пауза","пауза","przerwa") : LX("лимит","ліміт","limit")));
+          label = "⚠ "+n+"/"+rule.max+" · "+sh.join(" + ");
+        }else label = LX("каботаж ","каботаж ","kabotaż ")+n+"/"+rule.max;
       }
     }
     if(e.cur) rows[e.i] = {text:label, bad:bad};
