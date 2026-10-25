@@ -431,7 +431,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v110</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v112</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1839,6 +1839,13 @@ function payMonthDays(ym){
 /* ================= Каденции (начало / конец) ================= */
 function cadList(){ if(!Array.isArray(DB.cad)) DB.cad=[]; return DB.cad; }
 function cadToday(){ return dkey(new Date()); }
+function cadSug(kind){ /* дата из активной карты: выезд с базы / возврат на базу, иначе сегодня */
+  try{ const b=(C&&C.bus)||{}, z=(C&&C.baza)||{};
+    const c = kind==="s" ? [b.wyjD, z.wyjD] : [z.powrD, b.przyjBazD, b.powrD];
+    const ok = c.filter(x=>x && dtOf(x,"00:00")).sort();
+    if(ok.length) return kind==="s" ? ok[0] : ok[ok.length-1]; }catch(e){}
+  return cadToday();
+}
 function cadDays(c){
   const a=dtOf(c.s,"00:00"), b=dtOf(c.e||cadToday(),"00:00"); if(!a||!b) return 0;
   return Math.max(1, Math.round((b-a)/86400000)+1);
@@ -1856,8 +1863,8 @@ function cadHtml(){
     st=`<b>${T("Каденция закончена","Каденція закінчена","Kadencja zakończona")}</b> ${dshort(l.s)}–${dshort(l.e)} · ${d} ${T("дн.","дн.","dni")}<br>${T("Дома","Вдома","W domu")}: ${H} ${T("дн.","дн.","dni")} ${T("до","до","do")} ${dshort(until)}${left>0?` (${T("ещё","ще","jeszcze")} ${left})`:""}`;
   } else st=`<span class="hint">${T("Нажми «Начало каденции» в день выезда","Натисни «Початок каденції» в день виїзду","Naciśnij „Początek kadencji” w dniu wyjazdu")}</span>`;
   const lastC = cadLast();
-  const btn = o ? `<div class="row2"><button class="btn pri" data-cad="end">${T("Конец каденции","Кінець каденції","Koniec kadencji")}</button><button class="btn" data-cad="cancel">${T("Отменить начало","Скасувати початок","Anuluj początek")}</button></div>`
-                : `<div class="row2"><button class="btn pri" data-cad="start">${T("Начало каденции","Початок каденції","Początek kadencji")}</button>${lastC?`<button class="btn" data-cad="reopen">${T("Отменить конец","Скасувати кінець","Anuluj koniec")}</button>`:""}</div>`;
+  const btn = o ? `<div class="row2"><button class="btn pri" data-cad="end">${T("Конец каденции","Кінець каденції","Koniec kadencji")} · ${dshort(cadSug("e")<(cadOpen()||{s:""}).s?cadToday():cadSug("e"))}</button><button class="btn" data-cad="cancel">${T("Отменить начало","Скасувати початок","Anuluj początek")}</button></div>`
+                : `<div class="row2"><button class="btn pri" data-cad="start">${T("Начало каденции","Початок каденції","Początek kadencji")} · ${dshort(cadSug("s"))}</button>${lastC?`<button class="btn" data-cad="reopen">${T("Отменить конец","Скасувати кінець","Anuluj koniec")}</button>`:""}</div>`;
   return {st:st, btn:btn};
 }
 function paintCad(){
@@ -1883,8 +1890,8 @@ function cadSync(){ /* пересчитать дни в калькуляторе
 document.addEventListener("click", e=>{
   const b=e.target.closest("[data-cad]"); if(!b) return;
   const a=b.dataset.cad.split("|");
-  if(a[0]==="start"){ if(!cadOpen()) cadList().push({id:uid(), s:cadToday(), e:""}); }
-  else if(a[0]==="end"){ const o=cadOpen(); if(o) o.e=cadToday(); }
+  if(a[0]==="start"){ if(!cadOpen()) cadList().push({id:uid(), s:cadSug("s"), e:""}); }
+  else if(a[0]==="end"){ const o=cadOpen(); if(o){ let e=cadSug("e"); if(e<o.s) e=cadToday(); o.e=e; } }
   else if(a[0]==="cancel"){ const o=cadOpen(); if(o) cadList().splice(cadList().indexOf(o),1); }
   else if(a[0]==="reopen"){ const l=cadLast(); if(l) l.e=""; }
   else if(a[0]==="del"){ cadList().splice(+a[1],1); }
