@@ -421,7 +421,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v99</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v103</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1029,10 +1029,19 @@ function gpsF(pk,pm,label){ return `<div class="full"><label class="f"><span>${e
 function num(path,label,ph){ return `<label class="f"><span>${esc(label)}</span>
   <input data-p="${path}" value="${esc(getP(C,path))}" inputmode="decimal" placeholder="${esc(ph||"")}"></label>`; }
 /* Waga ładunku: либо вес, либо PCA (перецеп) — кнопка ставит PCA прямо в графу */
-function wagaF(path,label,ph){ const v = getP(C,path)||"";
+function wagaF(path,label,ph,noBtn){ const v = getP(C,path)||"";
   return `<label class="f"><span>${esc(label)}</span>
   <div class="row2"><input data-p="${path}" value="${esc(v)}" inputmode="decimal" placeholder="${esc(ph||"")}">
-  <button class="mini${isPca(v)?" on":""}" data-pca="${path}">PCA</button></div></label>`; }
+  ${noBtn ? "" : `<button class="mini${isPca(v)?" on":""}" data-pca="${path}">PCA</button>`}</div></label>`; }
+/* Перецепка: «Принял прицеп» / «Отдал прицеп» — ставит PCA в графу веса сам */
+function pcF(i){
+  const r = C.trasa[i], v = isPca(r.waga) ? (r.pc || "legacy") : "";
+  const b = (k,t)=>'<button class="mini'+(v===k?' on':'')+'" data-pc="'+i+'|'+k+'">'+t+'</button>';
+  return '<div class="full pcrow"><span style="font-size:12px;color:var(--dim)">'+LX("Перецепка","Перецепка","Przepięcie")+'</span><div class="row2" style="flex-wrap:wrap;margin-top:4px">'+
+    b("", LX("Нет","Ні","Nie")) + b("in", LX("Принял прицеп","Прийняв причіп","Przyjąłem naczepę")) + b("out", LX("Отдал прицеп","Віддав причіп","Oddałem naczepę")) + '</div></div>' +
+    '<div class="full powrap" style="'+(v==="in"?'':'display:none')+'">'+inp("trasa."+i+".po",LX("Где груз был загружен (страна, по CMR)","Де вантаж був завантажений (країна, за CMR)","Gdzie załadowano ładunek (kraj, wg CMR)"),"text",'placeholder="NL, PL, DE…" autocapitalize="characters"')+'</div>' +
+    '<div class="full pdwrap" style="'+(v==="out"?'':'display:none')+'">'+inp("trasa."+i+".pd",LX("Куда груз едет дальше (страна, по CMR)","Куди вантаж їде далі (країна, за CMR)","Dokąd jedzie ładunek dalej (kraj, wg CMR)"),"text",'placeholder="PL, FR, DE…" autocapitalize="characters"')+'</div>';
+}
 function yn(path,label){ const v=getP(C,path);
   return `<label class="f"><span>${esc(label)}</span><select data-p="${path}">
    <option value=""${v===""?" selected":""}>—</option>
@@ -1310,7 +1319,8 @@ function renderTrasa(){
     <div class="ihead"><b>Строка ${i+1}</b><span class="rst"></span><span class="rkm"></span><span class="rcab"></span><button class="fbtn" data-fold="trasa|${i}">Готово</button><button class="del" data-del="trasa|${i}">Удалить</button></div><div class="rsum"></div>
     <div class="grid">
       ${inp("trasa."+i+".nr","Nr zlecenia")}
-      ${wagaF("trasa."+i+".waga","Waga ładunku","т / кг | PCA")}
+      ${wagaF("trasa."+i+".waga","Waga ładunku","т / кг",true)}
+      ${pcF(i)}
     </div>
     <div class="sub">Załadunek — загрузка${zals(r).length?" 1":""}</div>
     <div class="grid">
@@ -2299,7 +2309,30 @@ function cabotage(){
       const veh = plateOf(card) || curPlate;   // каботаж считается по машине, не по водителю
       /* PCA = перецепка. Передал прицеп (страна загрузки ≠ страна «выгрузки») — это не доставка, пропускаем.
          Принял прицеп и довёз внутри одной страны — груз пришёл из-за границы, это международная доставка, а не каботаж. */
-      if(isPca(r.waga)){
+      const pcx = isPca(r.waga) ? r.pc : "";
+      /* отдал прицеп: международный отрезок — не доставка; но если загрузился и отдал в одной стране — это внутренний отрезок, считаем как обычный */
+      let needDest = false;
+      if(pcx === "out"){
+        if(all.size !== 1) return;
+        const dest = cabC(r.pd || ""), here = [...all][0];
+        if(dest && dest !== here) return;       // груз едет дальше в другую страну — международная перевозка, не каботаж
+        needDest = dest ? false : "out";
+      }
+      if(pcx === "in"){
+        /* принял прицеп: если груз загружен в другой стране — это международная доставка; если в той же — обычный рейс (каботаж) */
+        const org = cabC(r.po || "");
+        if(org && W.some(function(w){ return cabC(w.wk) !== org; })){
+          const seen = {};
+          W.forEach(function(w){
+            const c1 = cabC(w.wk); if(c1 === org || c1 === "PL" || seen[c1]) return; seen[c1] = 1;
+            const d1 = dnum(w.wd) != null ? dnum(w.wd) : dnum(Z[0].zd);
+            if(d1 != null) ev.push({t:"int", c:c1, v:veh, cn:card.name||"", d:d1, i:i, cur:cur, tie:0, nr:r.nr||"", from:org, city:w.wm||""});
+          });
+          return;
+        }
+        if(!org) needDest = "in";
+      }
+      if(isPca(r.waga) && !pcx){
         if(all.size !== 1) return;
         const c0 = [...all][0]; if(c0 === "PL") return;
         const d0 = dnum(W[W.length-1].wd) != null ? dnum(W[W.length-1].wd) : dnum(Z[0].zd);
@@ -2311,7 +2344,7 @@ function cabotage(){
         const zd = dnum(Z[0].zd), wd = dnum(W[W.length-1].wd), d = zd!=null ? zd : wd;
         if(d == null) return;
         const z0 = Z[0], w9 = W[W.length-1];
-        ev.push({t:"dom", c:c, v:veh, cn:card.name||"", d:d, e:(wd!=null?wd:d), i:i, cur:cur, tie:1,
+        ev.push({t:"dom", c:c, v:veh, cn:card.name||"", d:d, e:(wd!=null?wd:d), i:i, cur:cur, tie:1, nd:(typeof needDest!=="undefined" && needDest),
           nr:r.nr||"", zm:z0.zm||"", wm:w9.wm||"", zd:z0.zd||"", wd:w9.wd||""});
       }else{
         W.forEach(w=>{
@@ -2344,6 +2377,8 @@ function cabotage(){
     }
     if(s.g && s.g.rule) rule = s.g.rule;
     let label = "", bad = false;
+    if(e.nd === "in") add(e.cur,"a", nm+": "+LX("принял прицеп — укажи, где груз был загружен (страна по CMR). Если в другой стране, это международная доставка, не каботаж.","прийняв причіп — вкажи, де вантаж був завантажений (країна за CMR).","przyjęcie naczepy — podaj, gdzie załadowano ładunek (kraj wg CMR)."));
+    else if(e.nd) add(e.cur,"a", nm+": "+LX("отдал прицеп внутри страны — укажи, куда груз едет дальше. Если в другую страну, это не каботаж.","віддав причіп усередині країни — вкажи, куди вантаж їде далі. Якщо в іншу країну, це не каботаж.","oddanie naczepy w kraju — podaj dokąd jedzie ładunek. Jeśli do innego kraju, to nie kabotaż."));
     if(rule.ban){ add(e.cur,"r", nm+": "+LX("каботаж запрещён","каботаж заборонено","kabotaż zabroniony")); label = "🔴 "+LX("нельзя: в этой стране запрещено","не можна: в цій країні заборонено","nie wolno: w tym kraju zakaz"); bad = true;
       (s.ban || (s.ban = [])).push({d:e.d, e:e.e, cur:e.cur, bad:true, nr:e.nr, zm:e.zm, wm:e.wm, zd:e.zd, wd:e.wd}); }
     else if(rule.unknown){ return; }   // страны вне ЕС/UK/CH не считаем
@@ -2716,6 +2751,21 @@ document.addEventListener("click", async e=>{
     if(activeTab==="main") initSigs();
     window.scrollTo({top:0}); return; }
 
+  if(t.dataset.pc){
+    const a = t.dataset.pc.split("|"), i = +a[0], k = a[1], r = C.trasa[i]; if(!r) return;
+    const cur = String(r.waga||"").replace(/pca/ig,"").replace(/\s+/g," ").trim();
+    r.pc = k;
+    r.waga = k ? (cur ? cur+" PCA" : "PCA") : cur;
+    const row = t.closest(".item[data-row]");
+    if(row){
+      row.querySelectorAll('[data-pc]').forEach(function(x){ x.classList.toggle("on", x.dataset.pc === i+"|"+k); });
+      const pw = row.querySelector(".pdwrap"); if(pw) pw.style.display = (k === "out") ? "" : "none";
+      const po = row.querySelector(".powrap"); if(po) po.style.display = (k === "in") ? "" : "none";
+      const wi = row.querySelector('input[data-p="trasa.'+i+'.waga"]'); if(wi) wi.value = r.waga;
+    }
+    save(); paintEmpty(); if(row) paintRow(row); renderCab();
+    return;
+  }
   if(t.dataset.pca){
     const p = t.dataset.pca;
     const cur = String(getP(C,p)||"");
