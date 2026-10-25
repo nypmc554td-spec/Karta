@@ -1807,7 +1807,7 @@ function payCalc(){
   const D = Math.max(0,n("days")), day=n("day"), mon=n("base")+n("eco")+n("prem"), dm=n("dm")||30.4;
   const rd = Math.round;
   if(P.mode==="month"){
-    const k=Math.min(D/dm,1.0); return {mode:"month", D, k, abroad:D*day, base:n("base"), eco:n("eco")*k, prem:n("prem")*k, total:D*day+n("base")+(n("eco")+n("prem"))*k};
+    const k=Math.min(D/dm,1.0); return {mode:"month", D, k, abroad:D*day, base:n("base")*k, bfull:n("base"), eco:n("eco")*k, prem:n("prem")*k, total:D*day+(n("base")+n("eco")+n("prem"))*k};
   }
   const H = P.home!=="" && isFinite(parseFloat(P.home)) ? Math.max(0,parseFloat(P.home)) : rd(D/7*2);
   const cyc = D+H, months = cyc/dm, abroad = D*day;
@@ -1823,10 +1823,10 @@ function payOut(){
   if(r.mode==="month"){
     h += `<div class="big">${fz(r.total)}</div><div class="hint">${T("на руки за месяц, примерно","на руки за місяць, приблизно","na rękę za miesiąc, orientacyjnie")}</div>`;
     h += `<table class="ptb"><tr><td>${r.D} × ${fz(payS().day)} ${T("за границей","за кордоном","za granicą")}</td><td>${fz(r.abroad)}</td></tr>
-    <tr><td>${T("Оклад","Оклад","Podstawa")}</td><td>${fz(r.base)}</td></tr>
+    <tr><td>${T("Оклад","Оклад","Podstawa")} (${r.D}/${payS().dm})</td><td>${fz(r.base)}</td></tr>
     <tr><td>Eco (${r.D}/${payS().dm})</td><td>${fz(r.eco)}</td></tr><tr><td>${T("Премия","Премія","Premia")} (${r.D}/${payS().dm})</td><td>${fz(r.prem)}</td></tr></table>`;
     const hd = r.D/7*2, hv = Math.round(hd*10)/10;
-    h += `<div class="card" style="margin:8px 0"><b>${T("Дней дома набежало","Днів вдома набігло","Dni w domu do odebrania")}: ${hv}</b> <span class="hint">(${(r.D/7).toFixed(1)} ${T("нед.","тиж.","tyg.")} × 2)</span><br>${T("Оплачиваются по окладу","Оплачуються за окладом","Płatne wg podstawy")} ≈ <b>${fz(r.base*hd/(payS().dm||30.4))}</b></div>`;
+    h += `<div class="card" style="margin:8px 0"><b>${T("Дней дома набежало","Днів вдома набігло","Dni w domu do odebrania")}: ${hv}</b> <span class="hint">(${(r.D/7).toFixed(1)} ${T("нед.","тиж.","tyg.")} × 2)</span><br>${T("Оплачиваются по окладу","Оплачуються за окладом","Płatne wg podstawy")} ≈ <b>${fz(r.bfull*hd/(payS().dm||30.4))}</b></div>`;
   } else {
     h += `<div class="big">${fz(r.total)}</div><div class="hint">${T("за весь цикл","за весь цикл","za cały cykl")}: ${r.D} ${T("дн. в рейсе","дн. у рейсі","dni w trasie")} + ${r.H} ${T("дн. дома","дн. вдома","dni w domu")} = ${r.cyc} ${T("дн.","дн.","dni")}</div>`;
     h += `<table class="ptb"><tr><td>${T("За границей","За кордоном","Za granicą")}: ${r.D} × ${fz(payS().day)}</td><td>${fz(r.abroad)}</td></tr>
