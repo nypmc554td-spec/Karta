@@ -430,7 +430,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v105</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v106</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1355,14 +1355,14 @@ function renderTrasa(){
   <div class="item" data-row="trasa|${i}">
     <div class="ihead"><b>Строка ${i+1}</b><span class="rst"></span><span class="rkm"></span><span class="rcab"></span><button class="fbtn" data-fold="trasa|${i}">Готово</button><button class="del" data-del="trasa|${i}">Удалить</button></div><div class="rsum"></div>
     <div class="grid">
-      ${inp("trasa."+i+".nr","Nr zlecenia")}
-      ${wagaF("trasa."+i+".waga","Waga ładunku","т / кг",true)}
+      <div class="full">${inp("trasa."+i+".nr","Nr zlecenia")}</div>
     </div>
     <div class="sub">Załadunek — загрузка${zals(r).length?" 1":""}</div>
     <div class="grid">
       ${gpsF("trasa."+i+".zk","trasa."+i+".zm","Kraj / Miasto")}
       ${dtF("trasa."+i+".zd","trasa."+i+".zg","Data / Godz. — ПОСЛЕ окончания загрузки")}
       <div class="full">${num("trasa."+i+".zl","Stan licznika")}</div>
+      <div class="full">${wagaF("trasa."+i+".waga","Waga ładunku — вес по CMR","т / кг",true)}</div>
       ${pcSide(i,"in")}
     </div>
     ${zals(r).map((x,j)=>`
