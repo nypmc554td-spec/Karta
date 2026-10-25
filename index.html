@@ -431,7 +431,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v113</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v114</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1816,6 +1816,12 @@ function cardSpan(c){
   if(a1<a0) a1=a0;
   return {a0:a0,a1:a1};
 }
+function payHomeInMonth(ym, trip){
+  const y=+ym.slice(0,4), m=+ym.slice(5,7)-1, ms=new Date(y,m,1), me=new Date(y,m+1,0), hs={};
+  cadList().forEach(c=>{ if(!c.e) return; const H=Math.round(cadDays(c)/7*2);
+    for(let i=1;i<=H;i++){ const d=dtOf(cadAddDays(c.e,i),"00:00"); if(d>=ms&&d<=me){ const k=dkey(d); if(!(trip&&trip[k])) hs[k]=1; } } });
+  return Object.keys(hs).length;
+}
 function payMonthDays(ym){
   const y=+ym.slice(0,4), m=+ym.slice(5,7)-1, ms=new Date(y,m,1), me=new Date(y,m+1,0);
   const set={}, list=[];
@@ -1824,7 +1830,7 @@ function payMonthDays(ym){
     cds.forEach(c=>{ const a=dtOf(c.s,"00:00"), b=dtOf(c.e||cadToday(),"00:00"); const s0=a<ms?ms:a, s1=b>me?me:b; let n=0;
       for(let d=new Date(s0);d<=s1;d.setDate(d.getDate()+1)){ set[dkey(d)]=1; n++; }
       list.push({name:LX("Каденция","Каденція","Kadencja")+(c.e?"":" ▶"), from:dkey(s0), to:dkey(s1), n:n, crew:false}); });
-    list.sort((a,b)=>a.from<b.from?-1:1); return {days:Object.keys(set).length, list:list, cad:true};
+    list.sort((a,b)=>a.from<b.from?-1:1); return {days:Object.keys(set).length, list:list, cad:true, home:payHomeInMonth(ym,set)};
   }
   (DB.cards||[]).forEach(c=>{
     const sp=cardSpan(c); if(!sp) return;
@@ -1833,7 +1839,7 @@ function payMonthDays(ym){
     list.push({name:c.name, from:dkey(s0), to:dkey(s1), n:n, crew:!!(c.head&&c.head.k2n)});
   });
   list.sort((a,b)=>a.from<b.from?-1:1);
-  return {days:Object.keys(set).length, list:list};
+  return {days:Object.keys(set).length, list:list, home:payHomeInMonth(ym,set)};
 }
 
 /* ================= Каденции (начало / конец) ================= */
@@ -1883,7 +1889,7 @@ function cadEditHtml(T){
 function cadSync(){ /* пересчитать дни в калькуляторе */
   const P=payS();
   try{
-    if(P.mode==="month"){ P.days=payMonthDays(P.ym).days||P.days; }
+    if(P.mode==="month"){ P.days=payMonthDays(P.ym).days; }
     else { const l=cadOpen()||cadLast(); if(l){ P.days=cadDays(l); P.home=""; } }
   }catch(e){}
 }
@@ -1911,7 +1917,9 @@ function payCalc(){
   const D = Math.max(0,n("days")), day=n("day"), mon=n("base")+n("eco")+n("prem"), dm=n("dm")||30.4;
   const rd = Math.round;
   if(P.mode==="month"){
-    const k=Math.min(D/dm,1.0); return {mode:"month", D, k, abroad:D*day, base:n("base")*k, bfull:n("base"), eco:n("eco")*k, prem:n("prem")*k, total:D*day+(n("base")+n("eco")+n("prem"))*k};
+    let Hm=0; try{ Hm=payMonthDays(P.ym).home||0; }catch(e){}
+    const k=Math.min(D/dm,1.0), kb=Math.min((D+Hm)/dm,1.0);
+    return {mode:"month", D, Hm, k, abroad:D*day, base:n("base")*kb, bfull:n("base"), eco:n("eco")*k, prem:n("prem")*k, total:D*day+n("base")*kb+(n("eco")+n("prem"))*k};
   }
   const H = P.home!=="" && isFinite(parseFloat(P.home)) ? Math.max(0,parseFloat(P.home)) : rd(D/7*2);
   const cyc = D+H, months = cyc/dm, abroad = D*day;
@@ -1929,10 +1937,10 @@ function payOut(){
   if(r.mode==="month"){
     h += `<div class="big">${fz(r.total)}</div><div class="hint">${T("на руки за месяц, примерно","на руки за місяць, приблизно","na rękę za miesiąc, orientacyjnie")}</div>`;
     h += `<table class="ptb"><tr><td>${r.D} × ${fz(payS().day)} ${T("за границей","за кордоном","za granicą")}</td><td>${fz(r.abroad)}</td></tr>
-    <tr><td>${T("Оклад","Оклад","Podstawa")} (${r.D}/${payS().dm})</td><td>${fz(r.base)}</td></tr>
+    <tr><td>${T("Оклад","Оклад","Podstawa")} (${r.D}${r.Hm?"+"+r.Hm:""}/${payS().dm})</td><td>${fz(r.base)}</td></tr>
     <tr><td>Eco (${r.D}/${payS().dm})</td><td>${fz(r.eco)}</td></tr><tr><td>${T("Премия","Премія","Premia")} (${r.D}/${payS().dm})</td><td>${fz(r.prem)}</td></tr></table>`;
-    const hd = r.D/7*2, hv = Math.round(hd*10)/10;
-    h += `<div class="card" style="margin:8px 0"><b>${T("Дней дома набежало","Днів вдома набігло","Dni w domu do odebrania")}: ${hv}</b> <span class="hint">(${(r.D/7).toFixed(1)} ${T("нед.","тиж.","tyg.")} × 2)</span><br>${T("Оплачиваются по окладу","Оплачуються за окладом","Płatne wg podstawy")} ≈ <b>${fz(r.bfull*hd/(payS().dm||30.4))}</b></div>`;
+    const nm = (()=>{ const y=+payS().ym.slice(0,4), m=+payS().ym.slice(5,7); return String(m%12+1).padStart(2,"0"); })();
+    h += `<div class="card" style="margin:8px 0">${r.Hm?`<b>${T("Дней дома в этом месяце","Днів вдома цього місяця","Dni w domu w tym miesiącu")}: ${r.Hm}</b> <span class="hint">(${T("оплачены окладом, идут в оклад выше","оплачені окладом, входять в оклад вище","płatne podstawą, wliczone wyżej")})</span>`:`<span class="hint">${T("Дней дома в этом месяце нет — они попадут в тот месяц, когда будешь дома, после закрытия каденции.","Днів вдома цього місяця немає — вони потраплять у той місяць, коли будеш вдома, після закриття каденції.","W tym miesiącu brak dni w domu — wejdą do miesiąca, w którym będziesz w domu, po zamknięciu kadencji.")}</span>`}<br><span class="hint">${T("Выплата за этот месяц — 10."+nm,"Виплата за цей місяць — 10."+nm,"Wypłata za ten miesiąc — 10."+nm)}</span></div>`;
   } else {
     h += `<div class="big">${fz(r.total)}</div><div class="hint">${r.op ? T("заработано сейчас, "+r.D+" дн. в рейсе (дни дома ещё не оплачены)","зароблено зараз, "+r.D+" дн. у рейсі (дні вдома ще не оплачені)","zarobione teraz, "+r.D+" dni w trasie (dni w domu jeszcze nie płatne)") : T("за весь цикл","за весь цикл","za cały cykl")+": "+r.D+" "+T("дн. в рейсе","дн. у рейсі","dni w trasie")+" + "+r.H+" "+T("дн. дома","дн. вдома","dni w domu")+" = "+r.cyc+" "+T("дн.","дн.","dni")}</div>`;
     h += `<table class="ptb"><tr><td>${T("За границей","За кордоном","Za granicą")}: ${r.D} × ${fz(payS().day)}</td><td>${fz(r.abroad)}</td></tr>
