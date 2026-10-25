@@ -215,6 +215,25 @@ body[data-tab="cab"] #cabWarn{display:none!important}
 .sigwrap{margin:6px 0 12px}
 .sigrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}
 .sigrow .mini{min-height:38px}
+.tl{display:flex;gap:3px;overflow-x:auto;padding:6px 0 8px;-webkit-overflow-scrolling:touch}
+.tc{flex:0 0 40px;text-align:center;border-radius:9px;padding:3px 0 4px;background:#EEF0F2;color:#7a828c;border:2px solid transparent;font-size:10px}
+.tc b{display:block;min-height:24px;line-height:24px;font-size:11px;color:#1d2b3a}
+.tc span{display:block;font-size:10px}
+.tc.wn{background:#D9F0E0;color:#2b6a42}
+.tc.pz{background:#F9D6D2;color:#8a2a1d}
+.tc.both{background:repeating-linear-gradient(45deg,#D9F0E0 0 6px,#F9D6D2 6px 12px);color:#6a3a20}
+.tc.dl{background:#CFE0F7;color:#1d4a85}
+.tc.td{border-color:#1d2b3a}
+i.oc{display:inline-block;width:22px;height:22px;line-height:22px;border-radius:50%;background:#1F6B41;color:#fff;font-style:normal;font-weight:700;font-size:12px}
+i.oc.bad{background:#C62828}
+.tlnow{border-radius:10px;padding:8px 10px;font-size:14px;margin:4px 0}
+.tlnow.ok{background:#E3F4E8}.tlnow.am{background:#FFF1D6}.tlnow.gr{background:#EEF0F2}
+.tlleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--dim)}
+.tlleg span{display:inline-flex;align-items:center;gap:5px}
+.tlleg i.lg{width:14px;height:14px;border-radius:4px;display:inline-block}
+.tlleg i.lg.dl{background:#CFE0F7}.tlleg i.lg.wn{background:#D9F0E0}.tlleg i.lg.pz{background:#F9D6D2}
+.tlleg i.oc{display:inline-block;flex:0 0 18px;min-width:18px;width:18px;height:18px;line-height:18px;text-align:center;font-size:11px;padding:0;box-sizing:border-box}
+.tlleg i.lg{flex:0 0 14px}
 .fl{width:20px;height:13px;border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.18);vertical-align:-2px;margin-right:3px}
 .flpv{display:flex;align-items:center;flex:0 0 auto}
 .flpv .fl{width:28px;height:19px;margin:0 6px 0 0}
@@ -393,7 +412,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v91</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v93</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -2357,6 +2376,56 @@ function buildCabPrint(){
 }
 
 function flagOf(c){ try{ return c && c.length===2 ? String.fromCodePoint.apply(null, [...c].map(ch=>0x1F1E6 + ch.charCodeAt(0) - 65)) : ""; }catch(e){ return ""; } }
+
+/* График по стране: дни подряд — доставка, окно (зелёный), пауза (красный), рейсы кружками */
+function cabTimeline(c, items, today){
+  const days = {}, mark = d => (days[d] || (days[d] = {win:0, pause:0, dlv:0, op:null, bad:false}));
+  let lo = 1e9, hi = -1e9, latest = null;
+  items.forEach(x=>{
+    const g = x.g, rule = x.rule;
+    mark(g.start).dlv = 1; lo = Math.min(lo, g.start);
+    for(let k=1;k<=rule.days;k++){ mark(g.start+k).win = 1; }
+    hi = Math.max(hi, g.start + rule.days);
+    g.ops.forEach((o,i)=>{ const m = mark(o.d); m.op = i+1; if(o.bad) m.bad = true; });
+    if(rule.cool && g.ops.length){
+      const last = Math.max.apply(null, g.ops.map(o=>o.e));
+      for(let k=1;k<=rule.cool;k++) mark(last+k).pause = 1;
+      hi = Math.max(hi, last + rule.cool);
+    }
+    if(!latest || g.start > latest.g.start) latest = x;
+  });
+  hi = Math.max(hi, today + 2); lo = Math.min(lo, today);
+  if(hi - lo > 44) lo = hi - 44;
+  let cells = "";
+  for(let d=lo; d<=hi; d++){
+    const m = days[d] || {};
+    const cls = ["tc"]; let inner = "";
+    if(m.win && m.pause) cls.push("both"); else if(m.pause) cls.push("pz"); else if(m.win) cls.push("wn");
+    if(m.dlv){ cls.push("dl"); inner = '<b>'+LX("дост.","дост.","dost.")+'</b>'; }
+    if(m.op){ inner = '<b><i class="oc'+(m.bad?' bad':'')+'">'+m.op+'</i></b>'; }
+    if(!inner) inner = '<b>&nbsp;</b>';
+    if(d === today) cls.push("td");
+    cells += '<div class="'+cls.join(" ")+'">'+inner+'<span>'+esc(dfmt(d))+'</span></div>';
+  }
+  const t = days[today] || {};
+  let now;
+  const nm = krajName(c);
+  if(t.pause){
+    let last = 0; items.forEach(x=>{ if(x.g.ops.length && x.rule.cool) last = Math.max(last, Math.max.apply(null, x.g.ops.map(o=>o.e)) + x.rule.cool); });
+    now = '<div class="tlnow am">🟡 '+LX("Сегодня внутри страны нельзя: пауза до "+dfmt(last)+" включительно.","Сьогодні всередині країни не можна: пауза до "+dfmt(last)+" включно.","Dziś wewnątrz kraju nie wolno: przerwa do "+dfmt(last)+" włącznie.")+'</div>';
+  }else if(t.win && latest){
+    const left = latest.rule.max - latest.g.ops.length;
+    now = left > 0
+      ? '<div class="tlnow ok">🟢 '+LX("Сегодня можно: ещё "+left+" рейса внутри страны, выгрузить до "+dfmt(latest.g.start+latest.rule.days)+".","Сьогодні можна: ще "+left+" рейси всередині країни, розвантажити до "+dfmt(latest.g.start+latest.rule.days)+".","Dziś można: jeszcze "+left+" przewozy wewnątrz kraju, rozładunek do "+dfmt(latest.g.start+latest.rule.days)+".")+'</div>'
+      : '<div class="tlnow am">🟡 '+LX("Талоны кончились. Выезжай — потом будет пауза 4 дня.","Талони закінчились. Виїжджай — потім буде пауза 4 дні.","Limit wykorzystany. Wyjedź — potem 4 dni przerwy.")+'</div>';
+  }else{
+    now = '<div class="tlnow gr">⚪ '+LX("Сегодня внутри страны нельзя: нет открытого окна. Нужен международный груз в эту страну.","Сьогодні всередині країни не можна: немає відкритого вікна. Потрібен міжнародний вантаж у цю країну.","Dziś wewnątrz kraju nie wolno: brak otwartego okna. Potrzebny ładunek międzynarodowy do tego kraju.")+'</div>';
+  }
+  return '<div class="cabg"><div class="gh"><span class="gn">'+flagOf(c)+' '+esc(nm)+'</span></div>'+now+
+    '<div class="tl">'+cells+'</div>'+
+    '<div class="tlleg"><span><i class="lg dl"></i>'+LX("доставка в страну","доставка в країну","dostawa do kraju")+'</span><span><i class="lg wn"></i>'+LX("окно: можно","вікно: можна","okno: można")+'</span><span><i class="lg pz"></i>'+LX("пауза: нельзя","пауза: не можна","przerwa: nie wolno")+'</span><span><i class="oc">1</i>'+LX("рейс внутри страны","рейс всередині країни","przewóz wewnątrz kraju")+'</span><span><i class="oc bad">!</i>'+LX("нарушение","порушення","naruszenie")+'</span></div></div>';
+}
+
 function renderCabPane(r){
   const el = $("#pane-cab"); if(!el) return;
   const D_ = n => fmtD(isoOf(n));
@@ -2377,6 +2446,9 @@ function renderCabPane(r){
   }
   let html = '<button class="btn primary" id="btnCabPrint" style="width:100%;margin:10px 0 0">'+LX("Лист для координатора","Аркуш для координатора","Zestawienie dla koordynatora")+'</button>';
   if(!groups.length) html += '<div class="card"><h3>'+LX("Каботаж","Каботаж","Kabotaż")+'</h3><p class="hint" style="font-size:14px">'+LX("Каботажа пока не было — только международные доставки. Правила будут считаться, когда появится перевозка внутри чужой страны.","Каботажу ще не було — лише міжнародні доставки. Правила рахуватимуться, коли з'явиться перевезення всередині чужої країни.","Kabotażu jeszcze nie było — tylko dostawy międzynarodowe. Przepisy będą liczone, gdy pojawi się przewóz wewnątrz obcego kraju.")+'</p></div>';
+  const tlc = {};
+  groups.forEach(x=>{ if(x.ban) return; const a = tlc[x.c] || (tlc[x.c] = []); a.push(x); if(x.prev && !a.some(y=>y.g===x.prev)) a.push({c:x.c, g:x.prev, rule:x.rule}); });
+  Object.keys(tlc).forEach(c=>{ html += cabTimeline(c, tlc[c], r.today); });
   groups.forEach(x=>{
     const nm = krajName(x.c), fl = flagOf(x.c);
     if(x.ban){
@@ -2405,13 +2477,13 @@ function renderCabPane(r){
     }
     html += '<div class="cabg"><div class="gh"><span class="gn">'+fl+' '+esc(nm)+'</span>'+chip+'</div>' +
       '<div class="dots">'+dots+'<small>'+n+' '+LX("из","з","z")+' '+rule.max+'</small></div>' +
-      '<div class="strip">'+strip+'</div>' +
       '<div class="verdict">'+verdict+'</div>' +
       (prevRel(x) ? '<div class="verdict" style="font-size:12.5px;color:var(--dim)">'+LX("Прошлый каботаж в этой стране (та же машина","Попередній каботаж у цій країні (та сама машина","Poprzedni kabotaż w tym kraju (ten sam pojazd")+(prevRel(x).ops[0].cn?LX(', карта «',', карта «',', karta «')+esc(prevRel(x).ops[0].cn)+'»':'')+'): '+prevRel(x).ops.map(o=>esc(dfmt(o.d))).join(", ")+'.</div>' : '') +
       (n ? '<div class="ops">'+g.ops.map((o,k)=>'<div><i>'+(k+1)+'. '+esc(dfmt(o.d))+'</i><span>'+esc(o.nr||"—")+' · '+esc(o.zm||"?")+' → '+esc(o.wm||"?")+'</span></div>').join("")+'</div>' : '') +
       '</div>';
   });
   el.innerHTML = html + winCard + intro;
+  el.querySelectorAll(".tl").forEach(t=>{ const td = t.querySelector(".td"); if(td) t.scrollLeft = Math.max(0, td.offsetLeft - t.clientWidth/2); });
 }
 
 function renderCab(){
