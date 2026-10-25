@@ -421,7 +421,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v97</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v98</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -2326,13 +2326,22 @@ function cabotage(){
   });
   ev.sort((a,b)=> a.d-b.d || a.tie-b.tie);
 
-  const st = {}, rows = {}, issues = [];
+  const st = {}, rows = {}, issues = [], lastInt = {}, LE = {};
   const add = (cur, lvl, txt)=>{ if(cur && issues.every(x=>x.txt!==txt)) issues.push({lvl:lvl, txt:txt}); };
   ev.forEach(e=>{
     const key = e.v + "|" + e.c;
     const s = st[key] || (st[key] = {g:null, closed:[], c:e.c, v:e.v});
+    const prevEnd = LE[e.v]; LE[e.v] = (e.t==="int" || e.e==null) ? e.d : e.e;
+    if(e.t === "int") lastInt[e.v] = {d:e.d, c:e.c, nr:e.nr};
     if(e.t === "int"){ if(s.g && s.g.ops.length) s.closed.push(s.g); s.g = {start:e.d, ops:[], cur:e.cur, nr:e.nr, from:e.from, city:e.city}; return; }
-    const rule = cabRule(e.c), nm = krajName(e.c);
+    let rule = cabRule(e.c); const nm = krajName(e.c);
+    /* въезд порожним (ст. 8(2)): после международной доставки в другую страну — одна операция в этой стране */
+    if(!s.g && rule.max === 3 && !rule.ban){
+      const li = lastInt[e.v];
+      if(li && li.c !== e.c && e.d >= li.d && e.e <= li.d + 7)
+        s.g = {start:li.d, ops:[], cur:e.cur, nr:li.nr, from:li.c, city:"", rule:{max:1, days:7, cool:4}, unl:true};
+    }
+    if(s.g && s.g.rule) rule = s.g.rule;
     let label = "", bad = false;
     if(rule.ban){ add(e.cur,"r", nm+": "+LX("каботаж запрещён","каботаж заборонено","kabotaż zabroniony")); label = "🔴 "+LX("нельзя: в этой стране запрещено","не можна: в цій країні заборонено","nie wolno: w tym kraju zakaz"); bad = true;
       (s.ban || (s.ban = [])).push({d:e.d, e:e.e, cur:e.cur, bad:true, nr:e.nr, zm:e.zm, wm:e.wm, zd:e.zd, wd:e.wd}); }
@@ -2352,6 +2361,9 @@ function cabotage(){
           if(e.d - last <= rule.cool){ add(e.cur,"r", nm+": "+LX("пауза "+rule.cool+" дн. после прошлого каботажа (до "+dfmt(last+rule.cool)+")","пауза "+rule.cool+" дн. після попереднього каботажу (до "+dfmt(last+rule.cool)+")","przerwa "+rule.cool+" dni po poprzednim kabotażu (do "+dfmt(last+rule.cool)+")")); bad = true;
             why.push({k:"pause", last:last, cool:rule.cool}); }
         }
+        if(g.unl && n === 1 && prevEnd != null && e.d - prevEnd > 3){
+          add(e.cur,"a", nm+": "+LX("после порожнего въезда нужна погрузка не позже 3 дней — дата въезда не записана, а с прошлой выгрузки прошло "+(e.d-prevEnd)+" дн. Проверь по тахографу (граница).","після порожнього в’їзду потрібне завантаження не пізніше 3 днів — дата в’їзду не записана, а від минулого розвантаження минуло "+(e.d-prevEnd)+" дн. Перевір за тахографом.","po wjeździe bez ładunku załadunek najpóźniej w 3 dni — daty wjazdu brak, od ostatniego rozładunku minęło "+(e.d-prevEnd)+" dni. Sprawdź w tachografie."));
+        }
         g.ops.push({d:e.d, e:e.e, cur:e.cur, bad:bad, why:why, cn:e.cn, nr:e.nr, zm:e.zm, wm:e.wm, zd:e.zd, wd:e.wd});
         if(bad){
           const sh = why.map(w=> w.k==="late" ? LX("выгрузка позже "+rule.days+" дн.","розвантаження пізніше "+rule.days+" дн.","rozładunek po "+rule.days+" dniach") : (w.k==="pause" ? LX("ещё пауза","ще пауза","jeszcze przerwa") : LX("больше "+rule.max,"більше "+rule.max,"więcej niż "+rule.max)));
@@ -2366,7 +2378,7 @@ function cabotage(){
   const today = dnum(todayISO()), info = [];
   let newest = null;
   Object.keys(st).forEach(k=>{
-    const s = st[k], c = s.c, g = s.g, rule = cabRule(c);
+    const s = st[k], c = s.c, g = s.g, rule = (g && g.rule) || cabRule(c);
     if(s.v !== curPlate) return;
     if(!g || rule.ban || rule.unknown) return;
     const nm = krajName(c), left = g.start + rule.days - today;
@@ -2381,7 +2393,7 @@ function cabotage(){
   if(newest) info.push({lvl:"i", txt:newest.nm+": "+LX("🟢 можно до "+newest.rule.max+" рейсов внутри страны, последняя выгрузка до "+dfmt(newest.g.start+newest.rule.days),"🟢 можна до "+newest.rule.max+" рейсів всередині країни, останнє розвантаження до "+dfmt(newest.g.start+newest.rule.days),"🟢 można do "+newest.rule.max+" przewozów wewnątrz kraju, ostatni rozładunek do "+dfmt(newest.g.start+newest.rule.days))});
   const groups = [];
   Object.keys(st).forEach(k=>{ const s = st[k], c = s.c, arr = s.closed.concat(s.g ? [s.g] : []);
-    arr.forEach((g,ix)=>groups.push({c:c, g:g, rule:cabRule(c), prev:(ix>0 ? arr[ix-1] : null)}));
+    arr.forEach((g,ix)=>groups.push({c:c, g:g, rule:g.rule || cabRule(c), prev:(ix>0 ? arr[ix-1] : null)}));
     if(s.ban) groups.push({c:c, ban:s.ban, rule:cabRule(c)}); });
   return {rows:rows, issues:issues, info:info, groups:groups, today:today};
 }
@@ -2532,7 +2544,7 @@ function lawBlock(){
     h(LX("1. Что считается каботажем","1. Що вважається каботажем","1. Co to kabotaż")) + art("ст. 2 п. 6, ст. 8(1)") + ' — ' + LX("внутренняя перевозка за плату в другой стране ЕС, где перевозчик не зарегистрирован. Для тебя — любая внутренняя перевозка не в Польше.","внутрішнє перевезення за плату в іншій країні ЄС, де перевізник не зареєстрований.","przewóz krajowy za wynagrodzeniem w innym państwie UE niż państwo siedziby przewoźnika.") +
     h(LX("2. Три операции за семь дней","2. Три операції за сім днів","2. Trzy operacje w siedem dni")) + art("ст. 8(2)") + ' — ' + LX("после выгрузки международного груза в стране можно сделать до 3 каботажных операций тем же автомобилем. Последняя выгрузка — не позднее 7 дней после выгрузки международного груза. Неиспользованные операции не переносятся.","після розвантаження міжнародного вантажу в країні можна зробити до 3 операцій тим самим авто. Останнє розвантаження — не пізніше 7 днів. Невикористані операції не переносяться.","po rozładunku przesyłki międzynarodowej do 3 operacji tym samym pojazdem; ostatni rozładunek najpóźniej w 7. dniu. Niewykorzystane operacje nie przechodzą.") +
     h(LX("3. Пауза 4 дня","3. Пауза 4 дні","3. Przerwa 4 dni")) + art("ст. 8(2a)") + ' — ' + LX("после каботажа в стране тем же автомобилем нельзя делать каботаж в ней ещё 4 дня (считая с последней выгрузки). Новый международный груз в эту страну паузу не отменяет.","після каботажу в країні тим самим авто не можна робити каботаж у ній ще 4 дні. Новий міжнародний вантаж паузу не скасовує.","po kabotażu w danym państwie ten sam pojazd nie może wykonywać w nim kabotażu przez 4 dni. Nowy przewóz międzynarodowy nie skraca przerwy.") +
-    h(LX("4. Въезд порожним","4. Заїзд порожнім","4. Wjazd bez ładunku")) + art("ст. 8(2)") + ' — ' + LX("если ты въехал в страну порожним: только одна операция в этой стране, в течение 3 дней после въезда. ","якщо в’їхав порожнім: лише одна операція в країні протягом 3 днів. ","przy wjeździe bez ładunku: tylko jedna operacja w danym państwie, w ciągu 3 dni od wjazdu. ") + '<b>'+LX("Приложение это правило пока не проверяет.","Застосунок це правило поки не перевіряє.","Aplikacja tej zasady jeszcze nie sprawdza.")+'</b>' +
+    h(LX("4. Въезд порожним","4. Заїзд порожнім","4. Wjazd bez ładunku")) + art("ст. 8(2)") + ' — ' + LX("если ты въехал в страну порожним: только одна операция в этой стране, в течение 3 дней после въезда. ","якщо в’їхав порожнім: лише одна операція в країні протягом 3 днів. ","przy wjeździe bez ładunku: tylko jedna operacja w danym państwie, w ciągu 3 dni od wjazdu. ") + '<b>'+LX("Приложение проверяет: 1 операция, не позже 7 дней после доставки. Дату въезда оно не знает — смотрит на дату прошлой выгрузки и просит проверить по тахографу.","Застосунок перевіряє: 1 операція, не пізніше 7 днів. Дати в’їзду не знає — дивиться на минуле розвантаження.","Aplikacja sprawdza: 1 operacja, do 7 dni. Daty wjazdu nie zna — patrzy na poprzedni rozładunek.")+'</b>' +
     h(LX("5. Документы","5. Документи","5. Dokumenty")) + art("ст. 8(5)") + ' — ' + LX("CMR международной перевозки и документ на каждую каботажную операцию (дата выгрузки, госномер); хранить для проверки.","CMR міжнародного перевезення й документ на кожну операцію (дата розвантаження, номер авто).","CMR przewozu międzynarodowego i dokument każdej operacji kabotażowej (data rozładunku, numer rejestracyjny).") +
     h(LX("6. Несколько точек выгрузки","6. Кілька точок розвантаження","6. Wiele miejsc rozładunku")) + LX("Позиция Еврокомиссии (разъяснения к Пакету мобильности): рейс с несколькими выгрузками по одному договору перевозки — одна операция. Это не статья, а трактовка; проверяющие в странах иногда считают иначе.","Позиція Єврокомісії: рейс із кількома розвантаженнями за одним договором — одна операція. Це трактування, а не стаття.","Stanowisko Komisji Europejskiej: przewóz z wieloma rozładunkami na jednej umowie to jedna operacja. To wykładnia, nie przepis.") +
     h(LX("7. Великобритания и Швейцария","7. Велика Британія та Швейцарія","7. Wielka Brytania i Szwajcaria")) + LX("Великобритания: соглашение ЕС–Великобритания (TCA), до 2 операций за 7 дней. Швейцария: каботаж запрещён (соглашение ЕС–Швейцария о наземном транспорте). Норвегия: правила ЕС.","Велика Британія: угода ЄС–ВБ (TCA), до 2 операцій за 7 днів. Швейцарія: каботаж заборонено. Норвегія: правила ЄС.","Wielka Brytania: umowa UE–UK (TCA), do 2 operacji w 7 dni. Szwajcaria: kabotaż zabroniony. Norwegia: przepisy UE.") +
@@ -2591,6 +2603,7 @@ function renderCabPane(r){
     }
     html += '<div class="cabg"><div class="gh"><span class="gn">'+fl+' '+esc(nm)+'</span>'+chip+'</div>' +
       '<div class="dots">'+dots+'<small>'+n+' '+LX("из","з","z")+' '+rule.max+'</small></div>' +
+      (g.unl ? '<div class="verdict" style="font-size:12.5px;color:var(--dim)">'+LX("Въезд порожним после доставки в ","Заїзд порожнім після доставки в ","Wjazd bez ładunku po dostawie do ")+esc(krajName(g.from))+LX(": здесь только 1 операция, в течение 3 дней после въезда (ст. 8(2)).",": тут лише 1 операція протягом 3 днів після в’їзду (ст. 8(2)).",": tylko 1 operacja w ciągu 3 dni od wjazdu (art. 8 ust. 2).")+'</div>' : '') +
       '<div class="verdict">'+verdict+'</div>' +
       (prevRel(x) ? '<div class="verdict" style="font-size:12.5px;color:var(--dim)">'+LX("Прошлый каботаж в этой стране (та же машина","Попередній каботаж у цій країні (та сама машина","Poprzedni kabotaż w tym kraju (ten sam pojazd")+(prevRel(x).ops[0].cn?LX(', карта «',', карта «',', karta «')+esc(prevRel(x).ops[0].cn)+'»':'')+'): '+prevRel(x).ops.map(o=>esc(dfmt(o.d))).join(", ")+'.</div>' : '') +
       (n ? '<div class="ops">'+g.ops.map((o,k)=>'<div><i>'+(k+1)+'. '+esc(dfmt(o.d))+'</i><span>'+esc(o.nr||"—")+' · '+esc(o.zm||"?")+' → '+esc(o.wm||"?")+'</span></div>').join("")+'</div>' : '') +
