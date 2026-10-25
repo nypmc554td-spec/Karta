@@ -430,7 +430,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v106</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v107</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1071,7 +1071,7 @@ function wagaF(path,label,ph,noBtn){ const v = getP(C,path)||"";
 /* Перецепка: «Принял прицеп» / «Отдал прицеп» — ставит PCA в графу веса сам */
 function cF(path,label){ return '<label class="f"><span>'+esc(label)+'</span><div class="row2"><input data-p="'+path+'" value="'+esc(getP(C,path))+'" placeholder="Kraj" autocapitalize="characters" style="max-width:90px"></div></label>'; }
 function pcSide(i,side){
-  const r = C.trasa[i], cur = isPca(r.waga) ? (r.pc || "") : "", on = cur === side;
+  const r = C.trasa[i], on = r.pc === side;
   const isIn = side === "in";
   const lbl = isIn ? LX("Принял прицеп (перецепка)","Прийняв причіп (перецепка)","Przyjąłem naczepę (przepięcie)") : LX("Отдал прицеп (перецепка)","Віддав причіп (перецепка)","Oddałem naczepę (przepięcie)");
   const fld = isIn ? cF("trasa."+i+".po",LX("Где груз был загружен (страна, по CMR)","Де вантаж був завантажений (країна, за CMR)","Gdzie załadowano ładunek (kraj, wg CMR)"))
@@ -2347,7 +2347,7 @@ function cabotage(){
       const veh = plateOf(card) || curPlate;   // каботаж считается по машине, не по водителю
       /* PCA = перецепка. Передал прицеп (страна загрузки ≠ страна «выгрузки») — это не доставка, пропускаем.
          Принял прицеп и довёз внутри одной страны — груз пришёл из-за границы, это международная доставка, а не каботаж. */
-      const pcx = isPca(r.waga) ? r.pc : "";
+      const pcx = (r.pc === undefined || r.pc === null) ? (isPca(r.waga) ? "legacy" : "") : r.pc;   // решают кнопки и страны, а не текст в графе веса; "legacy" — старые строки с PCA, вписанным руками
       /* отдал прицеп: международный отрезок — не доставка; но если загрузился и отдал в одной стране — это внутренний отрезок, считаем как обычный */
       let needDest = false;
       if(pcx === "out"){
@@ -2370,7 +2370,7 @@ function cabotage(){
         }
         if(!org) needDest = "in";
       }
-      if(isPca(r.waga) && !pcx){
+      if(pcx === "legacy"){
         if(all.size !== 1) return;
         const c0 = [...all][0]; if(c0 === "PL") return;
         const d0 = dnum(W[W.length-1].wd) != null ? dnum(W[W.length-1].wd) : dnum(Z[0].zd);
@@ -2792,9 +2792,9 @@ document.addEventListener("click", async e=>{
   if(t.dataset.pc){
     const a = t.dataset.pc.split("|"), i = +a[0], r = C.trasa[i]; let k = a[1]; if(!r) return;
     const cur = String(r.waga||"").replace(/pca/ig,"").replace(/\s+/g," ").trim();
-    const k0 = k; k = (isPca(r.waga) && r.pc === k0) ? "" : k0;
+    const k0 = k; k = (r.pc === k0) ? "" : k0;
     r.pc = k;
-    r.waga = k ? (cur ? cur+" PCA" : "PCA") : cur;
+    r.waga = (k === "out") ? (cur ? cur+" PCA" : "PCA") : cur;   // PCA в графе веса — только когда отдал прицеп
     const row = t.closest(".item[data-row]");
     if(row){
       row.querySelectorAll('[data-pc]').forEach(function(x){ x.classList.toggle("on", x.dataset.pc === i+"|"+k); });
