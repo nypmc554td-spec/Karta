@@ -431,7 +431,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v109</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v110</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1855,8 +1855,9 @@ function cadHtml(){
     const left=Math.round((dtOf(until,"00:00")-dtOf(cadToday(),"00:00"))/86400000);
     st=`<b>${T("Каденция закончена","Каденція закінчена","Kadencja zakończona")}</b> ${dshort(l.s)}–${dshort(l.e)} · ${d} ${T("дн.","дн.","dni")}<br>${T("Дома","Вдома","W domu")}: ${H} ${T("дн.","дн.","dni")} ${T("до","до","do")} ${dshort(until)}${left>0?` (${T("ещё","ще","jeszcze")} ${left})`:""}`;
   } else st=`<span class="hint">${T("Нажми «Начало каденции» в день выезда","Натисни «Початок каденції» в день виїзду","Naciśnij „Początek kadencji” w dniu wyjazdu")}</span>`;
-  const btn = o ? `<button class="btn pri" data-cad="end">${T("Конец каденции","Кінець каденції","Koniec kadencji")}</button>`
-                : `<button class="btn pri" data-cad="start">${T("Начало каденции","Початок каденції","Początek kadencji")}</button>`;
+  const lastC = cadLast();
+  const btn = o ? `<div class="row2"><button class="btn pri" data-cad="end">${T("Конец каденции","Кінець каденції","Koniec kadencji")}</button><button class="btn" data-cad="cancel">${T("Отменить начало","Скасувати початок","Anuluj początek")}</button></div>`
+                : `<div class="row2"><button class="btn pri" data-cad="start">${T("Начало каденции","Початок каденції","Początek kadencji")}</button>${lastC?`<button class="btn" data-cad="reopen">${T("Отменить конец","Скасувати кінець","Anuluj koniec")}</button>`:""}</div>`;
   return {st:st, btn:btn};
 }
 function paintCad(){
@@ -1884,6 +1885,8 @@ document.addEventListener("click", e=>{
   const a=b.dataset.cad.split("|");
   if(a[0]==="start"){ if(!cadOpen()) cadList().push({id:uid(), s:cadToday(), e:""}); }
   else if(a[0]==="end"){ const o=cadOpen(); if(o) o.e=cadToday(); }
+  else if(a[0]==="cancel"){ const o=cadOpen(); if(o) cadList().splice(cadList().indexOf(o),1); }
+  else if(a[0]==="reopen"){ const l=cadLast(); if(l) l.e=""; }
   else if(a[0]==="del"){ cadList().splice(+a[1],1); }
   cadSync(); save(); paintCad(); if(activeTab==="pay") renderPay();
 });
