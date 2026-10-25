@@ -421,7 +421,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v98</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v99</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1032,7 +1032,7 @@ function num(path,label,ph){ return `<label class="f"><span>${esc(label)}</span>
 function wagaF(path,label,ph){ const v = getP(C,path)||"";
   return `<label class="f"><span>${esc(label)}</span>
   <div class="row2"><input data-p="${path}" value="${esc(v)}" inputmode="decimal" placeholder="${esc(ph||"")}">
-  <button class="mini${v==="PCA"?" on":""}" data-pca="${path}">PCA</button></div></label>`; }
+  <button class="mini${isPca(v)?" on":""}" data-pca="${path}">PCA</button></div></label>`; }
 function yn(path,label){ const v=getP(C,path);
   return `<label class="f"><span>${esc(label)}</span><select data-p="${path}">
    <option value=""${v===""?" selected":""}>—</option>
@@ -1568,8 +1568,9 @@ const CYR2LAT = {"А":"A","В":"B","С":"C","Е":"E","Н":"H","К":"K","М":"M",
 function krajCode(v){
   return String(v == null ? "" : v).trim().toUpperCase().split("").map(function(ch){ return CYR2LAT[ch] || ch; }).join("");
 }
+function isPca(v){ return /(^|[^A-Za-z])pca($|[^A-Za-z])/i.test(String(v==null?"":v)); }
 function nnum(v){
-  const s = String(v == null ? "" : v).replace(/\s/g, "").replace(",", ".");
+  const s = String(v == null ? "" : v).replace(/pca/ig,"").replace(/\s/g, "").replace(",", ".");
   if(!s || !/^-?\d+(\.\d+)?$/.test(s)) return null;
   const n = parseFloat(s);
   return isNaN(n) ? null : n;
@@ -1609,8 +1610,8 @@ function itogi(){
       if(s) cmap[s] = (cmap[s] || 0) + 1;
     });
     const w = nnum(r.waga);
-    if(w != null){ o.weight += w; o.weighed++; }
-    else if(String(r.waga || "").trim().toUpperCase() === "PCA") o.pca++;
+    if(isPca(r.waga)) o.pca++;
+    else if(w != null){ o.weight += w; o.weighed++; }
     const a = dtOf(r.zd, r.zg), b = dtOf(r.wd, r.wg);
     [a, b].forEach(function(x){
       if(!x) return;
@@ -2298,7 +2299,7 @@ function cabotage(){
       const veh = plateOf(card) || curPlate;   // каботаж считается по машине, не по водителю
       /* PCA = перецепка. Передал прицеп (страна загрузки ≠ страна «выгрузки») — это не доставка, пропускаем.
          Принял прицеп и довёз внутри одной страны — груз пришёл из-за границы, это международная доставка, а не каботаж. */
-      if(String(r.waga||"").trim().toUpperCase() === "PCA"){
+      if(isPca(r.waga)){
         if(all.size !== 1) return;
         const c0 = [...all][0]; if(c0 === "PL") return;
         const d0 = dnum(W[W.length-1].wd) != null ? dnum(W[W.length-1].wd) : dnum(Z[0].zd);
@@ -2717,8 +2718,9 @@ document.addEventListener("click", async e=>{
 
   if(t.dataset.pca){
     const p = t.dataset.pca;
-    const on = (getP(C,p)||"").trim().toUpperCase() === "PCA";
-    setP(C, p, on ? "" : "PCA");
+    const cur = String(getP(C,p)||"");
+    const on = isPca(cur);
+    setP(C, p, on ? cur.replace(/pca/ig,"").replace(/\s+/g," ").trim() : (cur.trim() ? cur.trim()+" PCA" : "PCA"));
     const box = t.closest(".row2");
     if(box) box.querySelectorAll("input").forEach(i=>{ const q=i.dataset.p; if(q) i.value = getP(C,q)||""; });
     t.classList.toggle("on", !on);
