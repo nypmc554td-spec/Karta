@@ -431,7 +431,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v108</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v109</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1141,7 +1141,7 @@ function fcGps(pk,pl,ru){
 function fcKm(path,pl){ return fcIn(path,pl,"",'inputmode="decimal"'); }
 
 function renderMain(){
-  $("#pane-main").innerHTML = `
+  $("#pane-main").innerHTML = '<div id="cadBar"></div>' + `
   <div class="frm">
     <div class="r c2">
       ${fcIn("head.nrWyjazdu","Numer Wyjazdu")}
@@ -1800,8 +1800,102 @@ function nkm(v){ return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, "
 
 
 /* ================= Калькулятор зарплаты (приблизительно) ================= */
+
+function cardSpan(c){
+  /* период рейса карты: выезд с базы — возврат, иначе первая/последняя дата записей */
+  const b = c.baza||{}; let a0=null,a1=null;
+  const x0 = dtOf(b.wyjD,"00:00"), x1 = dtOf(b.powrD,"00:00");
+  if(x0) a0=x0; if(x1) a1=x1;
+  if(!a0||!a1){
+    let mn=null,mx=null;
+    (c.trasa||[]).forEach(r=>{ zList(r).forEach(z=>{const d=dtOf(z.zd,"00:00"); if(d){ if(!mn||d<mn)mn=d; if(!mx||d>mx)mx=d; }});
+      wList(r).forEach(w=>{const d=dtOf(w.wd,"00:00"); if(d){ if(!mn||d<mn)mn=d; if(!mx||d>mx)mx=d; }}); });
+    if(!a0) a0=mn; if(!a1) a1=mx||a0;
+    if(!a0) return null;
+  }
+  if(a1<a0) a1=a0;
+  return {a0:a0,a1:a1};
+}
+function payMonthDays(ym){
+  const y=+ym.slice(0,4), m=+ym.slice(5,7)-1, ms=new Date(y,m,1), me=new Date(y,m+1,0);
+  const set={}, list=[];
+  const cds=cadList().filter(c=>{ const a=dtOf(c.s,"00:00"), b=dtOf(c.e||cadToday(),"00:00"); return a&&b&&a<=me&&b>=ms; });
+  if(cds.length){
+    cds.forEach(c=>{ const a=dtOf(c.s,"00:00"), b=dtOf(c.e||cadToday(),"00:00"); const s0=a<ms?ms:a, s1=b>me?me:b; let n=0;
+      for(let d=new Date(s0);d<=s1;d.setDate(d.getDate()+1)){ set[dkey(d)]=1; n++; }
+      list.push({name:LX("Каденция","Каденція","Kadencja")+(c.e?"":" ▶"), from:dkey(s0), to:dkey(s1), n:n, crew:false}); });
+    list.sort((a,b)=>a.from<b.from?-1:1); return {days:Object.keys(set).length, list:list, cad:true};
+  }
+  (DB.cards||[]).forEach(c=>{
+    const sp=cardSpan(c); if(!sp) return;
+    const s0=sp.a0<ms?ms:sp.a0, s1=sp.a1>me?me:sp.a1; if(s1<s0) return;
+    let n=0; for(let d=new Date(s0);d<=s1;d.setDate(d.getDate()+1)){ set[dkey(d)]=1; n++; }
+    list.push({name:c.name, from:dkey(s0), to:dkey(s1), n:n, crew:!!(c.head&&c.head.k2n)});
+  });
+  list.sort((a,b)=>a.from<b.from?-1:1);
+  return {days:Object.keys(set).length, list:list};
+}
+
+/* ================= Каденции (начало / конец) ================= */
+function cadList(){ if(!Array.isArray(DB.cad)) DB.cad=[]; return DB.cad; }
+function cadToday(){ return dkey(new Date()); }
+function cadDays(c){
+  const a=dtOf(c.s,"00:00"), b=dtOf(c.e||cadToday(),"00:00"); if(!a||!b) return 0;
+  return Math.max(1, Math.round((b-a)/86400000)+1);
+}
+function cadOpen(){ return cadList().find(c=>!c.e); }
+function cadAddDays(k,n){ const d=dtOf(k,"00:00"); d.setDate(d.getDate()+n); return dkey(d); }
+function cadLast(){ const L=cadList().slice().sort((a,b)=>a.s<b.s?-1:1); return L[L.length-1]; }
+function cadHtml(){
+  const T=(a,b,c)=>LX(a,b,c), o=cadOpen(), l=o||cadLast();
+  let st="";
+  if(o){ const d=cadDays(o), H=Math.round(d/7*2);
+    st=`<b>${T("Каденция идёт","Каденція триває","Kadencja trwa")}</b> · ${T("с","з","od")} ${dshort(o.s)} · ${T("день","день","dzień")} ${d} <span class="hint">(${T("дома будет","вдома буде","w domu będzie")} ${H} ${T("дн.","дн.","dni")})</span>`;
+  } else if(l){ const d=cadDays(l), H=Math.round(d/7*2), until=cadAddDays(l.e,H);
+    const left=Math.round((dtOf(until,"00:00")-dtOf(cadToday(),"00:00"))/86400000);
+    st=`<b>${T("Каденция закончена","Каденція закінчена","Kadencja zakończona")}</b> ${dshort(l.s)}–${dshort(l.e)} · ${d} ${T("дн.","дн.","dni")}<br>${T("Дома","Вдома","W domu")}: ${H} ${T("дн.","дн.","dni")} ${T("до","до","do")} ${dshort(until)}${left>0?` (${T("ещё","ще","jeszcze")} ${left})`:""}`;
+  } else st=`<span class="hint">${T("Нажми «Начало каденции» в день выезда","Натисни «Початок каденції» в день виїзду","Naciśnij „Początek kadencji” w dniu wyjazdu")}</span>`;
+  const btn = o ? `<button class="btn pri" data-cad="end">${T("Конец каденции","Кінець каденції","Koniec kadencji")}</button>`
+                : `<button class="btn pri" data-cad="start">${T("Начало каденции","Початок каденції","Początek kadencji")}</button>`;
+  return {st:st, btn:btn};
+}
+function paintCad(){
+  const el=$("#cadBar"); if(!el) return;
+  const h=cadHtml();
+  el.innerHTML=`<div class="card" style="margin:0 0 10px"><div style="margin-bottom:8px">${h.st}</div>${h.btn}</div>`;
+}
+function cadEditHtml(T){
+  const L=cadList().map((c,i)=>({c:c,i:i})).sort((a,b)=>a.c.s<b.c.s?1:-1);
+  const rows=L.map(x=>`<div class="row2" style="margin-top:6px;align-items:end">
+    <label class="fc"><span>${T("Начало","Початок","Początek")}</span><input type="date" data-cads="${x.i}|s" value="${esc(x.c.s)}"></label>
+    <label class="fc"><span>${T("Конец (пусто = идёт)","Кінець (порожньо = триває)","Koniec (puste = trwa)")}</span><input type="date" data-cads="${x.i}|e" value="${esc(x.c.e||"")}"></label>
+    <button class="btn" data-cad="del|${x.i}" style="max-width:48px">✕</button></div>`).join("");
+  return rows||`<div class="hint">${T("Каденций пока нет","Каденцій поки немає","Brak kadencji")}</div>`;
+}
+function cadSync(){ /* пересчитать дни в калькуляторе */
+  const P=payS();
+  try{
+    if(P.mode==="month"){ P.days=payMonthDays(P.ym).days||P.days; }
+    else { const l=cadOpen()||cadLast(); if(l){ P.days=cadDays(l); P.home=""; } }
+  }catch(e){}
+}
+document.addEventListener("click", e=>{
+  const b=e.target.closest("[data-cad]"); if(!b) return;
+  const a=b.dataset.cad.split("|");
+  if(a[0]==="start"){ if(!cadOpen()) cadList().push({id:uid(), s:cadToday(), e:""}); }
+  else if(a[0]==="end"){ const o=cadOpen(); if(o) o.e=cadToday(); }
+  else if(a[0]==="del"){ cadList().splice(+a[1],1); }
+  cadSync(); save(); paintCad(); if(activeTab==="pay") renderPay();
+});
+document.addEventListener("change", e=>{
+  const el=e.target.closest("[data-cads]"); if(!el) return;
+  const a=el.dataset.cads.split("|"), c=cadList()[+a[0]]; if(!c) return;
+  c[a[1]]=el.value; if(c.e && c.e<c.s){ if(a[1]==="s") c.e=c.s; else c.e=c.s; }
+  cadSync(); save(); paintCad(); renderPay();
+});
+{ const _rm=renderMain; renderMain=function(){ _rm.apply(this,arguments); paintCad(); }; }
 const PAYDEF = {days:42, mode:"cycle", day:290, base:3608, eco:900, prem:1550, dm:30.4, wk:6, home:""};
-function payS(){ DB.pay = Object.assign({}, PAYDEF, DB.pay||{}); return DB.pay; }
+function payS(){ DB.pay = Object.assign({}, PAYDEF, DB.pay||{}); if(!DB.pay.ym) DB.pay.ym = dkey(new Date()).slice(0,7); return DB.pay; }
 function payCalc(){
   const P = payS(), n = k=>{ const v=parseFloat(String(P[k]).replace(",",".")); return isFinite(v)?v:0; };
   const D = Math.max(0,n("days")), day=n("day"), mon=n("base")+n("eco")+n("prem"), dm=n("dm")||30.4;
@@ -1838,15 +1932,26 @@ function payOut(){
   h += `<p class="hint">${T("⚠ Приблизительно. Это не расчётный листок: точная сумма зависит от курса, налогов, ZUS и решения фирмы.","⚠ Приблизно. Це не розрахунковий листок: точна сума залежить від курсу, податків, ZUS і рішення фірми.","⚠ Orientacyjnie. To nie jest pasek płacowy: dokładna kwota zależy od kursu, podatków, ZUS i decyzji firmy.")}</p>`;
   el.innerHTML = h;
 }
+function payCardsHtml(P,T){
+  const r = payMonthDays(P.ym);
+  const rows = r.list.map(x=>`<tr><td>${esc(x.name)}${x.crew?" 👥":""}<br><span class="hint">${dshort(x.from)} – ${dshort(x.to)}</span></td><td>${x.n} ${T("дн.","дн.","dni")}</td></tr>`).join("");
+  return `<label class="fc" style="margin-top:8px"><span>${T("Месяц","Місяць","Miesiąc")}</span><input type="month" data-paym="1" value="${esc(P.ym)}"></label>
+  <table class="ptb">${rows||`<tr><td class="hint">${T("В этом месяце карт с датами нет","У цьому місяці карток з датами немає","Brak kart z datami w tym miesiącu")}</td><td></td></tr>`}
+  <tr><td><b>${T("Всего дней (без повторов)","Усього днів (без повторів)","Razem dni (bez powtórzeń)")}</b></td><td><b>${r.days}</b></td></tr></table>
+  <button class="btn" data-payfill="m" style="margin-top:2px">${T("Взять дни из карт месяца","Взяти дні з карток місяця","Weź dni z kart miesiąca")}: ${r.days}</button>`;
+}
 function renderPay(){
   const el = $("#pane-pay"); if(!el) return;
   const P = payS(), T=(a,b,c)=>LX(a,b,c);
   const f = (k,l,st)=>`<label class="fc"><span>${l}</span><input data-pay="${k}" inputmode="decimal" value="${esc(P[k])}" ${st||""}></label>`;
-  el.innerHTML = `<div class="card"><h3>${T("Калькулятор зарплаты","Калькулятор зарплати","Kalkulator wypłaty")}</h3>
+  const ch = cadHtml();
+  el.innerHTML = `<div class="card"><h3>${T("Каденция","Каденція","Kadencja")}</h3><div style="margin-bottom:8px">${ch.st}</div>${ch.btn}
+  <details style="margin-top:8px"><summary class="hint">${T("Список и правка дат","Список і правка дат","Lista i edycja dat")}</summary>${cadEditHtml(T)}</details></div>
+  <div class="card"><h3>${T("Калькулятор зарплаты","Калькулятор зарплати","Kalkulator wypłaty")}</h3>
   <div class="row2"><button class="btn ${P.mode==="cycle"?"pri":""}" data-paymode="cycle">${T("Весь цикл","Весь цикл","Cały cykl")}</button><button class="btn ${P.mode==="month"?"pri":""}" data-paymode="month">${T("Один месяц","Один місяць","Jeden miesiąc")}</button></div>
   <div class="row2" style="margin-top:8px">${f("days",P.mode==="cycle"?T("Дней в рейсе (за границей)","Днів у рейсі (за кордоном)","Dni w trasie"):T("Дней за границей в месяце","Днів за кордоном у місяці","Dni za granicą w miesiącu"))}
   ${P.mode==="cycle"?f("home",T("Дней дома (пусто = авто)","Днів вдома (порожньо = авто)","Dni w domu (puste = auto)")):""}</div>
-  <button class="btn" data-payfill="1" style="margin-top:6px">${T("Взять дни из текущей карты","Взяти дні з поточної карти","Weź dni z bieżącej karty")}</button>
+  ${P.mode==="month"? payCardsHtml(P,T) : `<button class="btn" data-payfill="1" style="margin-top:6px">${T("Взять дни из текущей карты","Взяти дні з поточної карти","Weź dni z bieżącej karty")}</button>`}
   <div class="hint" style="margin-top:6px">${P.mode==="cycle"?T("Дома = дни рейса ÷ 7 × 2 (6 недель → 12 дней).","Вдома = дні рейсу ÷ 7 × 2 (6 тижнів → 12 днів).","Dom = dni trasy ÷ 7 × 2 (6 tyg. → 12 dni)."):""}</div></div>
   <div class="card" id="payOut"></div>
   <details class="card"><summary><b>${T("Ставки (на руки, злотых)","Ставки (на руки, злотих)","Stawki (netto, zł)")}</b></summary>
@@ -1859,10 +1964,15 @@ document.addEventListener("input", e=>{
   const el = e.target.closest("[data-pay]"); if(!el) return;
   payS()[el.dataset.pay] = el.value; save(); payOut();
 });
+document.addEventListener("change", e=>{
+  const el = e.target.closest("[data-paym]"); if(!el||!el.value) return;
+  payS().ym = el.value; try{ payS().days = payMonthDays(el.value).days; }catch(err){} save(); renderPay();
+});
 document.addEventListener("click", e=>{
   const m = e.target.closest("[data-paymode]");
-  if(m){ payS().mode = m.dataset.paymode; if(m.dataset.paymode==="month" && payS().days>31) payS().days=30; save(); renderPay(); return; }
-  if(e.target.closest("[data-payfill]")){ try{ const o=itogi(); if(o.dayCount) payS().days=o.dayCount; }catch(err){} save(); renderPay(); }
+  if(m){ payS().mode = m.dataset.paymode; cadSync(); if(m.dataset.paymode==="month"){ try{ const n=payMonthDays(payS().ym).days; payS().days = n>0 ? n : Math.min(payS().days,31); }catch(err){} } save(); renderPay(); return; }
+  const pf = e.target.closest("[data-payfill]");
+  if(pf){ try{ if(pf.dataset.payfill==="m"){ const r=payMonthDays(payS().ym); payS().days=r.days; } else { const o=itogi(); if(o.dayCount) payS().days=o.dayCount; } }catch(err){} save(); renderPay(); }
 });
 
 function renderItogi(){
@@ -2004,7 +2114,7 @@ function buildItogiPrint(){
 function renderAll(){
   LANG_HOLD = true;
   renderTabs(); renderMain(); renderTrasa(); renderTank(); renderKoszty(); renderItogi(); renderPay(); renderInfo();
-  renderCards(); fillBackupInfo(); paintRows(); applyHl();
+  renderCards(); fillBackupInfo(); paintRows(); applyHl(); paintCad();
   LANG_HOLD = false;
   applyLang();
 }
@@ -2856,7 +2966,7 @@ document.addEventListener("click", async e=>{
 
   if(t.dataset.tab){ activeTab = t.dataset.tab; renderTabs();
     if(activeTab==="main") initSigs();
-    if(activeTab==="pay") renderPay();
+    if(activeTab==="pay"){ cadSync(); renderPay(); }
     window.scrollTo({top:0}); return; }
 
   if(t.dataset.pc){
@@ -3102,6 +3212,7 @@ $("#fileIn").addEventListener("change", e=>{
   r.onload = ()=>{ try{
       const data = JSON.parse(r.result);
       if(Array.isArray(data.sigLib)){ DB.sigLib = DB.sigLib||[]; data.sigLib.forEach(e=>{ if(e && e.v && !DB.sigLib.some(x=>x.v===e.v)) DB.sigLib.push(e); }); }
+      if(Array.isArray(data.cad)){ const L=cadList(); data.cad.forEach(x=>{ if(x && x.s && !L.some(y=>y.s===x.s)) L.push(x); }); }
       if(Array.isArray(data.veh)){ DB.veh = DB.veh||[]; data.veh.forEach(x=>{ if(x && !DB.veh.some(y=>plKey(y)===plKey(x))) DB.veh.push(x); }); }
       if(data.mycards){ ["fuel","bank"].forEach(k=> (data.mycards[k]||[]).forEach(n=> addMyCard(k,n))); }
       const list = Array.isArray(data.cards) ? data.cards : [data];
