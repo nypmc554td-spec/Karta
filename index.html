@@ -245,6 +245,15 @@ img.colo{position:absolute;right:4px;top:3px;height:24px;width:91px}
 .trasa .pfl{height:2.2mm;width:3.3mm;margin-right:.5mm}
 .pfl{display:inline-block;height:3mm;width:4.5mm;vertical-align:middle;margin-right:.8mm}
 .val.cardtxt{font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;font-weight:600;font-size:8.5pt;letter-spacing:.1px}
+#kpOv{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center}
+#kpOv .bx{background:#fff;width:100%;max-width:520px;max-height:85vh;overflow:auto;border-radius:16px 16px 0 0;padding:14px}
+#kpOv h4{margin:10px 0 6px;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+#kpOv .g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#kpOv .g button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;background:#fff;border:1.5px solid var(--line);border-radius:10px;font-size:12px;color:var(--ink)}
+#kpOv .g button svg,#kpOv .g button img{width:36px;height:24px}
+#kpOv .g button b{font-size:14px}
+#kpOv .g button.on{border-color:var(--green);background:#E6F3EA}
+.kpbtn{padding:6px 10px}
 #clsOv{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center}
 #clsOv .bx{background:#fff;width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px}
 #clsOv h3{margin:0 0 10px;font-size:17px}
@@ -421,7 +430,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v103</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v105</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -590,8 +599,12 @@ function pKr(v){ const t = String(v==null?"":v).trim(); return (gfxOn("fl") ? fl
 function pCard(v){ return fitv(v,13,"c cardtxt"); }
 /* флаги рядом с полями «страна» в приложении */
 function paintFlags(){
-  document.querySelectorAll('main input[data-p$=".kraj"], main input[data-p$=".zk"], main input[data-p$=".wk"], main input[data-p$="kraj"]').forEach(function(inp){
+  document.querySelectorAll('main input[data-p$=".kraj"], main input[data-p$=".zk"], main input[data-p$=".wk"], main input[data-p$="kraj"], main input[data-p$=".po"], main input[data-p$=".pd"]').forEach(function(inp){
     const par = inp.parentElement; if(!par) return;
+    if(!inp.nextElementSibling || !inp.nextElementSibling.classList.contains("kpbtn")){
+      const kb = document.createElement("button"); kb.type = "button"; kb.className = "mini kpbtn"; kb.textContent = "▾"; kb.title = "Выбрать страну";
+      inp.insertAdjacentElement("afterend", kb);
+    }
     let sp = par.querySelector(":scope > .flpv");
     if(!sp){ sp = document.createElement("span"); sp.className = "flpv"; par.insertBefore(sp, inp); }
     const h = flagImg(inp.value);
@@ -599,6 +612,28 @@ function paintFlags(){
     sp.style.display = h ? "" : "none";
   });
 }
+/* ============ Выбор страны с флажками ============ */
+const KP_TOP = ["PL","DE","NL","FR","IT","BE","AT","CZ","ES"];
+function countryPick(input){
+  const old = document.getElementById("kpOv"); if(old) old.remove();
+  const cur = cabC(input.value);
+  const codes = Object.keys(KRAJ).filter(function(k){ return k.length === 2 && FLAGS[k]; });
+  const rest = codes.filter(function(k){ return KP_TOP.indexOf(k) < 0; }).sort(function(a,b){ return krajName(a).localeCompare(krajName(b)); });
+  const btn = function(k){ return '<button type="button" data-kc="'+k+'" class="'+(k===cur?'on':'')+'">'+flagImg(k)+'<b>'+k+'</b><span>'+esc(krajName(k))+'</span></button>'; };
+  const ov = document.createElement("div"); ov.id = "kpOv";
+  ov.innerHTML = '<div class="bx"><h4>'+LX("Часто","Часто","Najczęściej")+'</h4><div class="g">'+KP_TOP.map(btn).join("")+'</div><h4>'+LX("Все страны","Усі країни","Wszystkie kraje")+'</h4><div class="g">'+rest.map(btn).join("")+'</div></div>';
+  ov.addEventListener("click", function(e){
+    const b = e.target.closest("[data-kc]");
+    if(b){ input.value = b.dataset.kc; input.dispatchEvent(new Event("input", {bubbles:true})); input.dispatchEvent(new Event("change", {bubbles:true})); ov.remove(); return; }
+    if(e.target === ov) ov.remove();
+  });
+  document.body.appendChild(ov);
+}
+document.addEventListener("click", function(e){
+  const b = e.target.closest && e.target.closest(".kpbtn"); if(!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const inp = b.previousElementSibling; if(inp && inp.tagName === "INPUT") countryPick(inp);
+}, true);
 /* ============ Валюты ============ */
 const CURR = ["EUR €","PLN zł","CHF","CZK Kč","DKK kr","NOK kr","SEK kr","HUF Ft","GBP £","RON lei"];
 const CURR_BY_KRAJ = {
@@ -1034,13 +1069,15 @@ function wagaF(path,label,ph,noBtn){ const v = getP(C,path)||"";
   <div class="row2"><input data-p="${path}" value="${esc(v)}" inputmode="decimal" placeholder="${esc(ph||"")}">
   ${noBtn ? "" : `<button class="mini${isPca(v)?" on":""}" data-pca="${path}">PCA</button>`}</div></label>`; }
 /* Перецепка: «Принял прицеп» / «Отдал прицеп» — ставит PCA в графу веса сам */
-function pcF(i){
-  const r = C.trasa[i], v = isPca(r.waga) ? (r.pc || "legacy") : "";
-  const b = (k,t)=>'<button class="mini'+(v===k?' on':'')+'" data-pc="'+i+'|'+k+'">'+t+'</button>';
-  return '<div class="full pcrow"><span style="font-size:12px;color:var(--dim)">'+LX("Перецепка","Перецепка","Przepięcie")+'</span><div class="row2" style="flex-wrap:wrap;margin-top:4px">'+
-    b("", LX("Нет","Ні","Nie")) + b("in", LX("Принял прицеп","Прийняв причіп","Przyjąłem naczepę")) + b("out", LX("Отдал прицеп","Віддав причіп","Oddałem naczepę")) + '</div></div>' +
-    '<div class="full powrap" style="'+(v==="in"?'':'display:none')+'">'+inp("trasa."+i+".po",LX("Где груз был загружен (страна, по CMR)","Де вантаж був завантажений (країна, за CMR)","Gdzie załadowano ładunek (kraj, wg CMR)"),"text",'placeholder="NL, PL, DE…" autocapitalize="characters"')+'</div>' +
-    '<div class="full pdwrap" style="'+(v==="out"?'':'display:none')+'">'+inp("trasa."+i+".pd",LX("Куда груз едет дальше (страна, по CMR)","Куди вантаж їде далі (країна, за CMR)","Dokąd jedzie ładunek dalej (kraj, wg CMR)"),"text",'placeholder="PL, FR, DE…" autocapitalize="characters"')+'</div>';
+function cF(path,label){ return '<label class="f"><span>'+esc(label)+'</span><div class="row2"><input data-p="'+path+'" value="'+esc(getP(C,path))+'" placeholder="Kraj" autocapitalize="characters" style="max-width:90px"></div></label>'; }
+function pcSide(i,side){
+  const r = C.trasa[i], cur = isPca(r.waga) ? (r.pc || "") : "", on = cur === side;
+  const isIn = side === "in";
+  const lbl = isIn ? LX("Принял прицеп (перецепка)","Прийняв причіп (перецепка)","Przyjąłem naczepę (przepięcie)") : LX("Отдал прицеп (перецепка)","Віддав причіп (перецепка)","Oddałem naczepę (przepięcie)");
+  const fld = isIn ? cF("trasa."+i+".po",LX("Где груз был загружен (страна, по CMR)","Де вантаж був завантажений (країна, за CMR)","Gdzie załadowano ładunek (kraj, wg CMR)"))
+                   : cF("trasa."+i+".pd",LX("Куда груз едет дальше (страна, по CMR)","Куди вантаж їде далі (країна, за CMR)","Dokąd jedzie ładunek dalej (kraj, wg CMR)"));
+  return '<div class="full pcrow"><button type="button" class="mini'+(on?' on':'')+'" data-pc="'+i+'|'+side+'">🔄 '+lbl+'</button></div>' +
+    '<div class="full '+(isIn?'powrap':'pdwrap')+'" style="'+(on?'':'display:none')+'">'+fld+'</div>';
 }
 function yn(path,label){ const v=getP(C,path);
   return `<label class="f"><span>${esc(label)}</span><select data-p="${path}">
@@ -1320,13 +1357,13 @@ function renderTrasa(){
     <div class="grid">
       ${inp("trasa."+i+".nr","Nr zlecenia")}
       ${wagaF("trasa."+i+".waga","Waga ładunku","т / кг",true)}
-      ${pcF(i)}
     </div>
     <div class="sub">Załadunek — загрузка${zals(r).length?" 1":""}</div>
     <div class="grid">
       ${gpsF("trasa."+i+".zk","trasa."+i+".zm","Kraj / Miasto")}
       ${dtF("trasa."+i+".zd","trasa."+i+".zg","Data / Godz. — ПОСЛЕ окончания загрузки")}
       <div class="full">${num("trasa."+i+".zl","Stan licznika")}</div>
+      ${pcSide(i,"in")}
     </div>
     ${zals(r).map((x,j)=>`
     <div class="sub">Załadunek — загрузка ${j+2}<button class="del" data-delz="${i}|${j}">Удалить</button></div>
@@ -1341,6 +1378,7 @@ function renderTrasa(){
       ${gpsF("trasa."+i+".wk","trasa."+i+".wm","Kraj / Miasto")}
       ${dtF("trasa."+i+".wd","trasa."+i+".wg","Data / Godz. — ПОСЛЕ окончания выгрузки")}
       <div class="full">${num("trasa."+i+".wl","Stan licznika")}</div>
+      ${pcSide(i,"out")}
     </div>
     ${wyls(r).map((x,j)=>`
     <div class="sub">Wyładunek — выгрузка ${j+2}<button class="del" data-delw="${i}|${j}">Удалить</button></div>
@@ -1746,7 +1784,7 @@ const KRAJ = {
   LU:["Люксембург","Люксембург","Luksemburg"], L:["Люксембург","Люксембург","Luksemburg"],
   GB:["Британия","Британія","Wielka Brytania"], PT:["Португалия","Португалія","Portugalia"],
   P:["Португалия","Португалія","Portugalia"], FI:["Финляндия","Фінляндія","Finlandia"],
-  IE:["Ирландия","Ірландія","Irlandia"], GR:["Греция","Греція","Grecja"], BG:["Болгария","Болгарія","Bułgaria"]
+  UA:["Украина","Україна","Ukraina"], BY:["Беларусь","Білорусь","Białoruś"], IE:["Ирландия","Ірландія","Irlandia"], GR:["Греция","Греція","Grecja"], BG:["Болгария","Болгарія","Bułgaria"]
 };
 function krajName(k){
   const a = KRAJ[k];
@@ -2698,7 +2736,7 @@ document.addEventListener("change", e=>{
 });
 document.addEventListener("input", e=>{
   const el = e.target.closest("[data-p]"); if(!el) return;
-  if(/(\.kraj|\.zk|\.wk|^kraj)$/.test(el.dataset.p||"")) try{ paintFlags(); }catch(err){}
+  if(/(\.kraj|\.zk|\.wk|\.po|\.pd|^kraj)$/.test(el.dataset.p||"")) try{ paintFlags(); }catch(err){}
   if(el.dataset.card && el.value === "__new") return;
   if(el.dataset.p) markEmpty(el);
   if(el.dataset.sum){
@@ -2752,8 +2790,9 @@ document.addEventListener("click", async e=>{
     window.scrollTo({top:0}); return; }
 
   if(t.dataset.pc){
-    const a = t.dataset.pc.split("|"), i = +a[0], k = a[1], r = C.trasa[i]; if(!r) return;
+    const a = t.dataset.pc.split("|"), i = +a[0], r = C.trasa[i]; let k = a[1]; if(!r) return;
     const cur = String(r.waga||"").replace(/pca/ig,"").replace(/\s+/g," ").trim();
+    const k0 = k; k = (isPca(r.waga) && r.pc === k0) ? "" : k0;
     r.pc = k;
     r.waga = k ? (cur ? cur+" PCA" : "PCA") : cur;
     const row = t.closest(".item[data-row]");
