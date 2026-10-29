@@ -2472,10 +2472,15 @@ async function snapshot(){
   }catch(e){}
 }
 
+// В файл идёт ТОЛЬКО открытая сейчас карта (+ справочники: подписи, каденция, машины, свои карты)
 function backupBlob(){
-  return new Blob([JSON.stringify(DB, null, 2)], {type:"application/json"});
+  const out = {v:3, cards:[C], sigLib:DB.sigLib||[], cad:DB.cad||[], veh:DB.veh||[], mycards:DB.mycards||{fuel:[],bank:[]}};
+  return new Blob([JSON.stringify(out, null, 2)], {type:"application/json"});
 }
-function backupName(){ return "karta-" + todayISO().slice(0,7) + ".json"; } // один файл на месяц
+function backupName(){
+  const nm = String((C && C.name) || todayISO().slice(0,7)).replace(/[^\wА-Яа-яЁё.-]+/g,"_");
+  return "karta-" + nm + ".json";   // один файл на карту
+}
 
 async function saveBackupFile(silent){
   try{
@@ -3236,16 +3241,25 @@ $("#fileIn").addEventListener("change", e=>{
       if(Array.isArray(data.veh)){ DB.veh = DB.veh||[]; data.veh.forEach(x=>{ if(x && !DB.veh.some(y=>plKey(y)===plKey(x))) DB.veh.push(x); }); }
       if(data.mycards){ ["fuel","bank"].forEach(k=> (data.mycards[k]||[]).forEach(n=> addMyCard(k,n))); }
       const list = Array.isArray(data.cards) ? data.cards : [data];
-      let added = 0;
+      let added = 0, replaced = 0, last = null;
       list.forEach(c=>{
-        const base = newCard();
-        const card = Object.assign(base, c, {id: uid()});
-        card.name = (c.name || "Импорт");
-        DB.cards.push(card); added++;
+        if(!c || typeof c !== "object") return;
+        const nm = (c.name || "Импорт");
+        // та же карта уже есть (по id, иначе по названию) — заменяем её, а не дублируем
+        let idx = c.id ? DB.cards.findIndex(x=>x.id===c.id) : -1;
+        if(idx < 0) idx = DB.cards.findIndex(x=>x.name===nm);
+        if(idx >= 0){
+          const card = Object.assign(newCard(), c, {id: DB.cards[idx].id, name: nm});
+          DB.cards[idx] = card; replaced++; last = card;
+        }else{
+          const card = Object.assign(newCard(), c, {id: uid(), name: nm});
+          DB.cards.push(card); added++; last = card;
+        }
       });
-      if(added){
-        C = DB.cards[DB.cards.length-1]; DB.active = C.id;
-        save(true); renderAll(); toast(added>1 ? `Загружено карт: ${added}` : "Карта загружена");
+      if(last){
+        C = last; DB.active = C.id;
+        save(true); renderAll();
+        toast(replaced && !added ? "Карта обновлена из копии" : (added+replaced>1 ? `Загружено карт: ${added+replaced}` : "Карта загружена"));
       }
     }catch(err){ toast("Файл не читается"); } };
   r.readAsText(f); e.target.value="";
