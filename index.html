@@ -431,7 +431,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v115</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v116</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -2852,6 +2852,8 @@ function renderCabPane(r){
   if(!groups.length) html += '<div class="card"><h3>'+LX("Каботаж","Каботаж","Kabotaż")+'</h3><p class="hint" style="font-size:14px">'+LX("Каботажа пока не было — только международные доставки. Правила будут считаться, когда появится перевозка внутри чужой страны.","Каботажу ще не було — лише міжнародні доставки. Правила рахуватимуться, коли з'явиться перевезення всередині чужої країни.","Kabotażu jeszcze nie było — tylko dostawy międzynarodowe. Przepisy będą liczone, gdy pojawi się przewóz wewnątrz obcego kraju.")+'</p></div>';
   const tlc = {};
   groups.forEach(x=>{ if(x.ban) return; const a = tlc[x.c] || (tlc[x.c] = []); a.push(x); if(x.prev && !a.some(y=>y.g===x.prev)) a.push({c:x.c, g:x.prev, rule:x.rule}); });
+  /* открытые окна (доставка была, операций ещё нет) тоже идут в график — иначе график говорит «окна нет», а «Открытые окна» — «можно» */
+  wins.forEach(x=>{ const a = tlc[x.c] || (tlc[x.c] = []); if(!a.some(y=>y.g===x.g)) a.push({c:x.c, g:x.g, rule:x.rule}); });
   Object.keys(tlc).forEach(c=>{ html += cabTimeline(c, tlc[c], r.today); });
   groups.forEach(x=>{
     const nm = krajName(x.c), fl = flagOf(x.c);
@@ -2867,7 +2869,8 @@ function renderCabPane(r){
     const pauseTo = (rule.cool && lastEnd!=null) ? lastEnd + rule.cool : null;
     let chip, verdict;
     if(viol){ chip = '<span class="chip rd">'+LX("Нарушение","Порушення","Naruszenie")+'</span>'; const reasons = g.ops.filter(o=>o.bad && o.why && o.why.length).map(o=>'<div style="margin-top:4px">• '+LX("Операция ","Операція ","Operacja ")+esc(o.nr||"")+' ('+esc(dfmt(o.d))+'): '+esc(whyTxt(o.why))+'.</div>').join("");
-      verdict = '<b>'+LX("Нарушение правил каботажа.","Порушення правил каботажу.","Naruszenie zasad kabotażu.")+'</b>'+reasons+'<div style="margin-top:6px;color:var(--dim);font-size:12.5px">'+LX("Операций использовано: "+n+" из "+rule.max+". Покажи координатору лист.","Операцій використано: "+n+" з "+rule.max+". Покажи координатору аркуш.","Wykorzystano operacji: "+n+" z "+rule.max+". Pokaż koordynatorowi zestawienie.")+'</div>'; }
+      verdict = '<b>'+LX("Нарушение правил каботажа.","Порушення правил каботажу.","Naruszenie zasad kabotażu.")+'</b>'+reasons+'<div style="margin-top:6px;color:var(--dim);font-size:12.5px">'+LX("Операций использовано: "+n+" из "+rule.max+". Покажи координатору лист.","Операцій використано: "+n+" з "+rule.max+". Покажи координатору аркуш.","Wykorzystano operacji: "+n+" z "+rule.max+". Pokaż koordynatorowi zestawienie.")+'</div>' +
+        (left < 0 ? '<div style="margin-top:4px;color:var(--dim);font-size:12.5px">'+LX("Это прошлое: окно закрылось "+D_(dl)+", на сегодняшние рейсы не влияет — смотри график и «Открытые окна».","Це минуле: вікно закрилось "+D_(dl)+", на сьогоднішні рейси не впливає — дивись графік і «Відкриті вікна».","To przeszłość: okno zamknęło się "+D_(dl)+", nie wpływa na dzisiejsze przewozy — patrz wykres i „Otwarte okna”.")+'</div>' : ''); }
     else if(n < rule.max && left >= 0){ chip = '<span class="chip ok">'+LX("Можно ещё ","Можна ще ","Można jeszcze ")+(rule.max-n)+'</span>'; verdict = LX("Можно ещё <b>"+(rule.max-n)+"</b>. Последняя выгрузка — не позже <b>"+D_(dl)+"</b> (осталось "+left+" дн.).","Можна ще <b>"+(rule.max-n)+"</b>. Останнє розвантаження — не пізніше <b>"+D_(dl)+"</b> (залишилось "+left+" дн.).","Można jeszcze <b>"+(rule.max-n)+"</b>. Ostatni rozładunek najpóźniej <b>"+D_(dl)+"</b> (zostało "+left+" dni)."); }
     else if(pauseTo!=null && r.today <= pauseTo){ chip = '<span class="chip am">'+LX("Пауза до ","Пауза до ","Przerwa do ")+dfmt(pauseTo)+'</span>'; verdict = (n>=rule.max?LX("Лимит использован.","Ліміт використано.","Limit wykorzystany."):LX("Окно закрыто.","Вікно закрите.","Okno zamknięte."))+' '+LX("Каботаж в этой стране нельзя до <b>"+D_(pauseTo)+"</b>, со следующего дня можно.","Каботаж у цій країні не можна до <b>"+D_(pauseTo)+"</b>, з наступного дня можна.","Kabotaż w tym kraju niemożliwy do <b>"+D_(pauseTo)+"</b>, od następnego dnia można."); }
     else { chip = '<span class="chip gr">'+LX("Окно закрыто","Вікно закрите","Okno zamknięte")+'</span>'; verdict = (n>=rule.max?LX("Лимит использован.","Ліміт використано.","Limit wykorzystany."):LX("Окно закрыто.","Вікно закрите.","Okno zamknięte."))+' '+LX("Новый каботаж — после следующей международной доставки","Новий каботаж — після наступної міжнародної доставки","Nowy kabotaż — po kolejnej dostawie międzynarodowej")+(pauseTo!=null?' ('+LX("после ","після ","po ")+D_(pauseTo)+')':'')+'.'; }
