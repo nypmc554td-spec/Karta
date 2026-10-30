@@ -263,6 +263,12 @@ img.colo{position:absolute;right:4px;top:3px;height:24px;width:91px}
 #clsOv .st{margin-top:10px;padding:10px;border-radius:10px;font-size:14px;line-height:1.35}
 #clsOv .st.ok{background:#E6F3EA;color:#1f5c38}#clsOv .st.bad{background:#FBE9E5;color:#9a2c1a}
 #clsOv .acts{display:flex;gap:8px;margin-top:14px}#clsOv .acts .btn{flex:1}
+#entOv{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center}
+#entOv .bx{background:#fff;width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px}
+#entOv h3{margin:0 0 10px;font-size:17px}
+#entOv label{display:block;font-size:12px;color:var(--dim);margin:10px 0 3px}
+#entOv input{width:100%;padding:10px;font-size:16px;border:1.5px solid var(--line);border-radius:10px;background:#fff}
+#entOv .acts{display:flex;gap:8px;margin-top:14px}#entOv .acts .btn{flex:1;padding-left:6px;padding-right:6px}
 #clsOv .chk2{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:14px}#clsOv .chk2 input{width:auto}
 .sigpick{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
 .sigpick .sp{background:#fff;border:1.5px solid var(--line,#ccd);border-radius:10px;padding:4px;width:calc(50% - 4px);display:flex;flex-direction:column;align-items:center}
@@ -431,7 +437,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v116</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v117</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -1366,6 +1372,7 @@ function renderTrasa(){
       <div class="full">${num("trasa."+i+".zl","Stan licznika")}</div>
       <div class="full">${wagaF("trasa."+i+".waga","Waga ładunku — вес по CMR","т / кг",true)}</div>
       ${pcSide(i,"in")}
+      ${entLine(i)}
     </div>
     ${zals(r).map((x,j)=>`
     <div class="sub">Załadunek — загрузка ${j+2}<button class="del" data-delz="${i}|${j}">Удалить</button></div>
@@ -2538,6 +2545,87 @@ function dnum(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso||""); return m
 function dfmt(n){ const d = new Date(n*86400000); return String(d.getUTCDate()).padStart(2,"0")+"."+String(d.getUTCMonth()+1).padStart(2,"0"); }
 
 function plateOf(card){ return String((card && card.head && card.head.nrRej) || "").toUpperCase().replace(/[^A-Z0-9]/g,""); }
+/* ================= Порожний въезд: приложение само замечает и спрашивает дату =================
+   Прошлая выгрузка в стране A, следующая (внутренняя) загрузка в стране B ≠ A  →  значит, в B заехал порожним.
+   Дата въезда пишется в строку Trasa (r.ent) и нужна для правила «загрузка не позже 3 дней после въезда». */
+function entryNeed(card, i){
+  const r = card.trasa && card.trasa[i]; if(!r || r.pc) return null;
+  const Z = zList(r).filter(x=>cabC(x.zk)), W = wList(r).filter(x=>cabC(x.wk));
+  if(!Z.length || !W.length) return null;
+  const all = new Set(Z.map(x=>cabC(x.zk)).concat(W.map(x=>cabC(x.wk))));
+  if(all.size !== 1) return null;                       // только внутренние рейсы (потенциальный каботаж)
+  const to = [...all][0], rule = cabRule(to);
+  if(to === "PL" || rule.ban || rule.unknown) return null;
+  const ld = dnum(Z[0].zd); if(ld == null) return null;
+  let pv = null;
+  if(i > 0) pv = card.trasa[i-1];
+  else{                                                   // первая строка карты — смотрим конец прошлой карты этой же машины
+    const pl0 = plateOf(card); let bd = -1;
+    if(pl0) (DB.cards||[]).forEach(c=>{
+      if(c === card || plateOf(c) !== pl0 || !c.trasa || !c.trasa.length) return;
+      const lr = c.trasa[c.trasa.length-1], lw = wList(lr).filter(x=>cabC(x.wk)); if(!lw.length) return;
+      const d = dnum(lw[lw.length-1].wd);
+      if(d != null && d <= ld && d > bd){ bd = d; pv = lr; }
+    });
+  }
+  if(!pv) return null;
+  const PW = wList(pv).filter(x=>cabC(x.wk)); if(!PW.length) return null;
+  const pl = PW[PW.length-1], from = cabC(pl.wk), pd = dnum(pl.wd);
+  if(!from || from === to || from === "PL" || pd == null) return null;   // из Польши порожним — права на каботаж и так нет
+  return {to:to, from:from, pd:pd, ld:ld};
+}
+var ENT_SKIP = new Set(), entT = 0;
+function askEntry(i){
+  const nd = entryNeed(C, i); if(!nd || document.getElementById("entOv")) return;
+  const r = C.trasa[i];
+  const ov = document.createElement("div"); ov.id = "entOv";
+  ov.innerHTML = '<div class="bx"><h3>🚛 '+LX("Въезд порожним","Заїзд порожнім","Wjazd bez ładunku")+'</h3>'+
+    '<p style="font-size:14px;line-height:1.45;margin:0 0 6px">'+
+      LX("Прошлая выгрузка: <b>"+esc(krajName(nd.from))+"</b>, "+esc(dfmt(nd.pd))+". Следующая загрузка: <b>"+esc(krajName(nd.to))+"</b>, "+esc(dfmt(nd.ld))+".<br>Значит, в "+esc(krajName(nd.to))+" ты заехал порожним. Когда пересёк границу?",
+         "Минуле розвантаження: <b>"+esc(krajName(nd.from))+"</b>, "+esc(dfmt(nd.pd))+". Наступне завантаження: <b>"+esc(krajName(nd.to))+"</b>, "+esc(dfmt(nd.ld))+".<br>Отже, в "+esc(krajName(nd.to))+" ти заїхав порожнім. Коли перетнув кордон?",
+         "Poprzedni rozładunek: <b>"+esc(krajName(nd.from))+"</b>, "+esc(dfmt(nd.pd))+". Następny załadunek: <b>"+esc(krajName(nd.to))+"</b>, "+esc(dfmt(nd.ld))+".<br>Czyli do "+esc(krajName(nd.to))+" wjechałeś bez ładunku. Kiedy przekroczyłeś granicę?")+'</p>'+
+    '<label>'+LX("Дата въезда","Дата в’їзду","Data wjazdu")+'</label>'+
+    '<input type="date" id="ent_d" min="'+isoOf(nd.pd)+'" max="'+isoOf(nd.ld)+'" value="'+((r.ent && r.ent!=="no") ? esc(r.ent) : "")+'">'+
+    '<div class="hint" style="margin:6px 0 0">'+LX("Дату смотри по тахографу (отметка границы). Нужна для правила: загрузка не позже 3 дней после въезда.","Дату дивись за тахографом (позначка кордону). Потрібна для правила: завантаження не пізніше 3 днів після в’їзду.","Datę sprawdź w tachografie (znacznik granicy). Potrzebna do reguły: załadunek najpóźniej w 3 dni po wjeździe.")+'</div>'+
+    '<div class="acts"><button class="btn ghost" id="ent_later">'+LX("Позже","Пізніше","Później")+'</button><button class="btn ghost" id="ent_no">'+LX("Не порожним","Не порожнім","Nie bez ładunku")+'</button><button class="btn primary" id="ent_ok">'+LX("Сохранить","Зберегти","Zapisz")+'</button></div></div>';
+  document.body.appendChild(ov);
+  const q = id => ov.querySelector("#"+id);
+  const close = ()=>{ ov.remove(); };
+  q("ent_later").onclick = ()=>{ ENT_SKIP.add(i+"|"+nd.to+"|"+nd.ld); close(); };
+  ov.addEventListener("click", e=>{ if(e.target===ov){ ENT_SKIP.add(i+"|"+nd.to+"|"+nd.ld); close(); } });
+  const fin = ()=>{ close(); save(true); renderList("trasa"); paintRows(); };
+  q("ent_no").onclick = ()=>{ r.ent = "no"; fin(); };
+  q("ent_ok").onclick = ()=>{
+    const v = q("ent_d").value, n = dnum(v);
+    if(n == null || n < nd.pd || n > nd.ld){ toast(LX("Укажи дату между выгрузкой и загрузкой","Вкажи дату між розвантаженням і завантаженням","Podaj datę między rozładunkiem a załadunkiem")); return; }
+    r.ent = v; fin(); toast(LX("Дата въезда записана","Дату в’їзду записано","Data wjazdu zapisana"));
+  };
+}
+function checkEntry(){
+  try{
+    if(!C || !C.trasa || document.getElementById("entOv") || document.getElementById("clsOv")) return;
+    const a = document.activeElement;
+    if(a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return;      // не мешаем, пока вводишь данные
+    for(let i=0;i<C.trasa.length;i++){
+      if(C.trasa[i].ent) continue;
+      const nd = entryNeed(C, i); if(!nd) continue;
+      if(ENT_SKIP.has(i+"|"+nd.to+"|"+nd.ld)) continue;
+      askEntry(i); return;
+    }
+  }catch(e){}
+}
+function schedEntry(ms){ clearTimeout(entT); entT = setTimeout(checkEntry, ms || 1500); }
+document.addEventListener("focusout", ()=>schedEntry(900));
+document.addEventListener("click", e=>{
+  const b = e.target.closest("[data-ent]"); if(!b) return;
+  e.preventDefault(); askEntry(+b.dataset.ent);
+});
+function entLine(i){
+  const nd = entryNeed(C, i); if(!nd) return "";
+  const v = C.trasa[i].ent;
+  const t = !v ? LX("указать дату","вказати дату","podaj datę") : (v === "no" ? LX("не порожним","не порожнім","nie bez ładunku") : fmtD(v));
+  return '<div class="full"><button class="mini" data-ent="'+i+'">🚛 '+LX("Въезд порожним в ","Заїзд порожнім в ","Wjazd bez ładunku do ")+esc(krajName(nd.to))+': '+esc(t)+'</button></div>';
+}
 function cabotage(){
   const curPlate = plateOf(C);
   const ev = [];
@@ -2586,7 +2674,7 @@ function cabotage(){
         const zd = dnum(Z[0].zd), wd = dnum(W[W.length-1].wd), d = zd!=null ? zd : wd;
         if(d == null) return;
         const z0 = Z[0], w9 = W[W.length-1];
-        ev.push({t:"dom", c:c, v:veh, cn:card.name||"", d:d, e:(wd!=null?wd:d), i:i, cur:cur, tie:1, nd:(typeof needDest!=="undefined" && needDest),
+        ev.push({t:"dom", c:c, v:veh, cn:card.name||"", d:d, e:(wd!=null?wd:d), i:i, cur:cur, tie:1, en:(r.ent||""), nd:(typeof needDest!=="undefined" && needDest),
           nr:r.nr||"", zm:z0.zm||"", wm:w9.wm||"", zd:z0.zd||"", wd:w9.wd||""});
       }else{
         W.forEach(w=>{
@@ -2639,12 +2727,17 @@ function cabotage(){
           if(e.d - last <= rule.cool){ add(e.cur,"r", nm+": "+LX("пауза "+rule.cool+" дн. после прошлого каботажа (до "+dfmt(last+rule.cool)+")","пауза "+rule.cool+" дн. після попереднього каботажу (до "+dfmt(last+rule.cool)+")","przerwa "+rule.cool+" dni po poprzednim kabotażu (do "+dfmt(last+rule.cool)+")")); bad = true;
             why.push({k:"pause", last:last, cool:rule.cool}); }
         }
-        if(g.unl && n === 1 && prevEnd != null && e.d - prevEnd > 3){
+        const enD = dnum(e.en);
+        if(g.unl && n === 1 && enD != null && e.d - enD > 3){
+          add(e.cur,"r", nm+": "+LX("после порожнего въезда ("+dfmt(enD)+") загрузка ("+dfmt(e.d)+") позже 3 дней","після порожнього в’їзду ("+dfmt(enD)+") завантаження ("+dfmt(e.d)+") пізніше 3 днів","po wjeździe bez ładunku ("+dfmt(enD)+") załadunek ("+dfmt(e.d)+") później niż 3 dni")); bad = true;
+          why.push({k:"entry", en:enD, d:e.d});
+        }
+        if(g.unl && n === 1 && enD == null && e.en !== "no" && prevEnd != null && e.d - prevEnd > 3){
           add(e.cur,"a", nm+": "+LX("после порожнего въезда нужна погрузка не позже 3 дней — дата въезда не записана, а с прошлой выгрузки прошло "+(e.d-prevEnd)+" дн. Проверь по тахографу (граница).","після порожнього в’їзду потрібне завантаження не пізніше 3 днів — дата в’їзду не записана, а від минулого розвантаження минуло "+(e.d-prevEnd)+" дн. Перевір за тахографом.","po wjeździe bez ładunku załadunek najpóźniej w 3 dni — daty wjazdu brak, od ostatniego rozładunku minęło "+(e.d-prevEnd)+" dni. Sprawdź w tachografie."));
         }
         g.ops.push({d:e.d, e:e.e, cur:e.cur, bad:bad, why:why, cn:e.cn, nr:e.nr, zm:e.zm, wm:e.wm, zd:e.zd, wd:e.wd});
         if(bad){
-          const sh = why.map(w=> w.k==="late" ? LX("выгрузка позже "+rule.days+" дн.","розвантаження пізніше "+rule.days+" дн.","rozładunek po "+rule.days+" dniach") : (w.k==="pause" ? LX("ещё пауза","ще пауза","jeszcze przerwa") : LX("больше "+rule.max,"більше "+rule.max,"więcej niż "+rule.max)));
+          const sh = why.map(w=> w.k==="late" ? LX("выгрузка позже "+rule.days+" дн.","розвантаження пізніше "+rule.days+" дн.","rozładunek po "+rule.days+" dniach") : (w.k==="pause" ? LX("ещё пауза","ще пауза","jeszcze przerwa") : (w.k==="entry" ? LX("загрузка >3 дн. после въезда","завантаження >3 дн. після в’їзду","załadunek >3 dni po wjeździe") : LX("больше "+rule.max,"більше "+rule.max,"więcej niż "+rule.max))));
           label = "🔴 "+LX("нельзя: ","не можна: ","nie wolno: ")+sh.join(" + ");
         }else label = "🟢 "+LX("внутри страны — можно ("+n+" из "+rule.max+")","всередині країни — можна ("+n+" з "+rule.max+")","wewnątrz kraju — można ("+n+" z "+rule.max+")");
       }
@@ -2684,6 +2777,9 @@ function whyTxt(arr){
     if(w.k==="late") return LX("выгрузка ("+dfmt(w.e)+") позже "+w.days+" дней после международной доставки ("+dfmt(w.s)+")",
       "розвантаження ("+dfmt(w.e)+") пізніше ніж "+w.days+" днів після міжнародної доставки ("+dfmt(w.s)+")",
       "rozładunek ("+dfmt(w.e)+") później niż "+w.days+" dni po dostawie międzynarodowej ("+dfmt(w.s)+")");
+    if(w.k==="entry") return LX("после порожнего въезда ("+dfmt(w.en)+") загрузка ("+dfmt(w.d)+") позже 3 дней",
+      "після порожнього в’їзду ("+dfmt(w.en)+") завантаження ("+dfmt(w.d)+") пізніше 3 днів",
+      "po wjeździe bez ładunku ("+dfmt(w.en)+") załadunek ("+dfmt(w.d)+") później niż 3 dni");
     if(w.k==="cnt") return LX(w.n+"-я операция, а лимит "+w.max, w.n+"-а операція, а ліміт "+w.max, w.n+". operacja, limit to "+w.max);
     if(w.k==="pause") return LX("после прошлого каботажа ("+dfmt(w.last)+") ещё не прошла пауза "+w.cool+" дн. — каботаж можно с "+dfmt(w.last+w.cool+1),
       "після попереднього каботажу ("+dfmt(w.last)+") ще не минула пауза "+w.cool+" дн. — каботаж можна з "+dfmt(w.last+w.cool+1),
@@ -2900,6 +2996,7 @@ function renderCab(){
     const el = $("#cabWarn"); if(!el) return;
     const r = cabotage();
     renderCabPane(r);
+    schedEntry(1500);
     const lines = r.issues.map(x=>({lvl:x.lvl, txt:x.txt})).concat(r.info);
     const cls = {r:"cab-r", a:"cab-a", i:"cab-i"};
     if(!lines.length){ el.style.display = "none"; el.innerHTML = ""; }
