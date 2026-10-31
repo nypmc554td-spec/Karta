@@ -437,7 +437,7 @@ svg.bchart{height:15px}
 <body>
 
 <header>
-  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v119</span><small id="saveState">—</small></div>
+  <div class="brand"><img id="appLogo" src="" alt=""><b>Karta drogowa</b><span style="color:var(--dim);font-size:11px">v120</span><small id="saveState">—</small></div>
   <div class="bar">
     <button class="btn primary" id="btnPrint">Печать / PDF</button>
     <select id="langSel" class="btn" style="width:auto;padding:9px 26px 9px 10px;font-size:14px" title="Język / Мова / Язык">
@@ -752,11 +752,11 @@ function closeCardDlg(){
   const carry = function(){
     const pl = plKey(q("cl_pl").value);
     const same = !!oldPl && pl === oldPl;
-    const have = [st.kmK, st.palK, st.adbK].some(function(x){ return String(x||"").trim() !== ""; });
+    const have = [st.kmK, st.palK, st.kompK, st.adbK].some(function(x){ return String(x||"").trim() !== ""; });
     const box = q("cl_st"); let force = false;
     if(same){
       box.className = "st ok";
-      box.innerHTML = '✓ '+LX("Тот же авто. Перенесу в начало: пробег ","Той самий авто. Перенесу на початок: пробіг ","Ten sam pojazd. Przeniosę na start: przebieg ")+'<b>'+esc(st.kmK||"—")+'</b>, '+LX("топливо ","пальне ","paliwo ")+'<b>'+esc(st.palK||"—")+'</b>, AdBlue <b>'+esc(st.adbK||"—")+'</b>'+
+      box.innerHTML = '✓ '+LX("Тот же авто. Перенесу в начало: пробег ","Той самий авто. Перенесу на початок: пробіг ","Ten sam pojazd. Przeniosę na start: przebieg ")+'<b>'+esc(st.kmK||"—")+'</b>, '+LX("топливо ","пальне ","paliwo ")+'<b>'+esc(st.palK||"—")+'</b>, '+LX("компьютер ","комп’ютер ","komputer ")+'<b>'+esc(st.kompK||"—")+'</b>, AdBlue <b>'+esc(st.adbK||"—")+'</b>'+
         (have ? "" : '<br>'+LX("На старой карте конечные значения не заполнены.","На старій карті кінцеві значення не заповнені.","Na starej karcie brak wartości końcowych."));
     } else {
       box.className = "st bad";
@@ -780,7 +780,7 @@ function closeCardDlg(){
     if(e1){ nc.head.k1i = e1.i||""; nc.head.k1n = e1.n||""; }
     if(e2){ nc.head.k2i = e2.i||""; nc.head.k2n = e2.n||""; }
     const doCarry = r.same || (r.force && q("cl_f").checked);
-    if(doCarry){ nc.stany.kmP = st.kmK||""; nc.stany.palP = st.palK||""; nc.stany.adbP = st.adbK||""; }
+    if(doCarry){ nc.stany.kmP = st.kmK||""; nc.stany.palP = st.palK||""; nc.stany.kompP = st.kompK||""; nc.stany.adbP = st.adbK||""; }
     DB.cards.push(nc); DB.active = nc.id; C = nc; rememberSig(); syncLib(); save(true); renderAll(); done();
     toast(doCarry ? "Новая карта создана, остатки перенесены" : "Новая карта создана");
   };
